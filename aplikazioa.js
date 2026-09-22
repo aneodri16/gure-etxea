@@ -11,6 +11,160 @@ let etxekoOharrak = [];
 
 const DATUEN_GAKOA = "gure_etxea_datuak_v1";
 
+// ========================================
+// SUPABASE AUTENTIFIKAZIOA
+// ========================================
+const supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY
+);
+let erabiltzailea = null;
+
+function erakutsiSaioPantaila(mezua = "") {
+    const edukia = document.getElementById("edukia");
+    const menua = document.querySelector(".menua");
+    if (menua) menua.style.display = "none";
+    if (!edukia) return;
+
+    edukia.innerHTML = `
+        <div class="saioPantaila">
+            <div class="saioTxartela">
+                <div class="saioIkonoa">🔐</div>
+                <h2>Gure etxea</h2>
+                <p class="saioAzalpena">Hasi saioa zure etxeko datuak ikusteko.</p>
+
+                <form id="saioInprimakia" onsubmit="saioaHasi(event)">
+                    <label for="saioEmaila">Emaila</label>
+                    <input type="email" id="saioEmaila" autocomplete="email" required placeholder="zure@emaila.eus">
+
+                    <label for="saioPasahitza">Pasahitza</label>
+                    <input type="password" id="saioPasahitza" autocomplete="current-password" required placeholder="Pasahitza">
+
+                    <button type="submit" class="saioBotoiNagusia">🔓 Saioa hasi</button>
+                </form>
+
+                <div id="saioMezua" class="saioMezua">${ihesTestua(mezua)}</div>
+
+                <div class="saioBereizlea"><span>edo</span></div>
+
+                <button type="button" class="saioBotoiBiguna" onclick="kontuaSortu()">➕ Kontua sortu</button>
+                <button type="button" class="saioBotoiTestua" onclick="pasahitzaBerreskuratu()">🔑 Pasahitza ahaztu dut</button>
+            </div>
+        </div>
+    `;
+}
+
+function erakutsiAplikazioa() {
+    const menua = document.querySelector(".menua");
+    if (menua) menua.style.display = "grid";
+    const edukia = document.getElementById("edukia");
+    if (edukia) {
+        edukia.innerHTML = `
+            <div class="saioaGoiburua">
+                <div>
+                    <h2>Ongi etorri! 👋</h2>
+                    <p>${ihesTestua(erabiltzailea?.email || "")}</p>
+                </div>
+                <button onclick="saioaItxi()">🔒 Itxi saioa</button>
+            </div>
+            <p>Aukeratu atal bat hasteko.</p>
+        `;
+    }
+}
+
+async function saioaHasi(event) {
+    event.preventDefault();
+    const email = document.getElementById("saioEmaila")?.value.trim() || "";
+    const pasahitza = document.getElementById("saioPasahitza")?.value || "";
+    const mezua = document.getElementById("saioMezua");
+
+    if (mezua) mezua.textContent = "⏳ Saioa hasten...";
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pasahitza });
+
+    if (error) {
+        if (mezua) mezua.textContent = "❌ Emaila edo pasahitza ez da zuzena.";
+        return;
+    }
+
+    erabiltzailea = data.user;
+    erakutsiAplikazioa();
+}
+
+async function kontuaSortu() {
+    const email = document.getElementById("saioEmaila")?.value.trim() || "";
+    const pasahitza = document.getElementById("saioPasahitza")?.value || "";
+    const mezua = document.getElementById("saioMezua");
+
+    if (!email || !pasahitza) {
+        if (mezua) mezua.textContent = "✏️ Idatzi emaila eta pasahitza lehenengo.";
+        return;
+    }
+    if (pasahitza.length < 6) {
+        if (mezua) mezua.textContent = "🔐 Pasahitzak gutxienez 6 karaktere izan behar ditu.";
+        return;
+    }
+
+    if (mezua) mezua.textContent = "⏳ Kontua sortzen...";
+    const { data, error } = await supabaseClient.auth.signUp({ email, password: pasahitza });
+
+    if (error) {
+        if (mezua) mezua.textContent = "❌ Ezin izan da kontua sortu: " + error.message;
+        return;
+    }
+
+    if (data.session) {
+        erabiltzailea = data.user;
+        erakutsiAplikazioa();
+    } else {
+        if (mezua) mezua.textContent = "📧 Kontua sortuta. Begiratu emaila eta baieztatu kontua; ondoren hasi saioa.";
+    }
+}
+
+async function pasahitzaBerreskuratu() {
+    const email = document.getElementById("saioEmaila")?.value.trim() || "";
+    const mezua = document.getElementById("saioMezua");
+    if (!email) {
+        if (mezua) mezua.textContent = "✏️ Idatzi emaila lehenengo.";
+        return;
+    }
+
+    if (mezua) mezua.textContent = "⏳ Berreskuratze-emaila bidaltzen...";
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + window.location.pathname
+    });
+
+    if (error) {
+        if (mezua) mezua.textContent = "❌ Ezin izan da emaila bidali.";
+        return;
+    }
+    if (mezua) mezua.textContent = "📧 Begiratu zure emaila pasahitza berrezartzeko.";
+}
+
+async function saioaItxi() {
+    await supabaseClient.auth.signOut();
+    erabiltzailea = null;
+    erakutsiSaioPantaila();
+}
+
+async function egiaztatuSaioa() {
+    const { data, error } = await supabaseClient.auth.getUser();
+    if (error || !data.user) {
+        erabiltzailea = null;
+        erakutsiSaioPantaila();
+        return;
+    }
+    erabiltzailea = data.user;
+    erakutsiAplikazioa();
+}
+
+supabaseClient.auth.onAuthStateChange((_event, session) => {
+    erabiltzailea = session?.user || null;
+    if (erabiltzailea) erakutsiAplikazioa();
+    else erakutsiSaioPantaila();
+});
+
+
+
 function gordeDatuak() {
     try {
         localStorage.setItem(DATUEN_GAKOA, JSON.stringify({
@@ -44,6 +198,7 @@ function kargatuDatuak() {
 }
 
 kargatuDatuak();
+window.addEventListener("DOMContentLoaded", egiaztatuSaioa);
 
 const plangintzaAukerak = [
     "Tupperra",
