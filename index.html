@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="eu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gure etxea</title>
+<link rel="stylesheet" href="estiloa.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#f5f3ef">
+<link rel="icon" href="ikonoa.svg" type="image/svg+xml">
+</head>
+<body>
+<header>
+<h1>🏠 Gure etxea</h1>
+<p>Etxeko gauza guztiak, leku berean.</p>
+</header>
+<main>
+<section class="menua">
+<button onclick="erakutsiAtala('platerak')">🍽️<span>Platerak</span></button>
+<button onclick="erakutsiAtala('plangintza')">📅<span>Aste-plangintza</span></button>
+<button onclick="erakutsiAtala('erosketa')">🛒<span>Erosketa-zerrenda</span></button>
+<button onclick="erakutsiAtala('musika')">🎵<span>Erreprodukzio-zerrendak</span></button>
+<button onclick="erakutsiAtala('datak')">❤️<span>Data garrantzitsuak</span></button>
+</section>
+<section id="edukia"><h2>Ongi etorri! 👋</h2><p>Aukeratu atal bat hasteko.</p></section>
+</main>
+<script src="https://apis.google.com/js/api.js"></script>
+<script src="https://accounts.google.com/gsi/client"></script>
+<script src="google-konfigurazioa.js"></script>
+<script src="aplikazioa.js"></script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>

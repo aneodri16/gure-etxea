@@ -1,0 +1,766 @@
+// ========================================
+// DATUAK
+// ========================================
+let platerak = [];
+let osagaienKatalogoa = [];
+let astePlangintza = {};
+let unekoAsteHasiera = null;
+let erosketaZerrenda = [];
+let dataGarrantzitsuak = [];
+
+const DATUEN_GAKOA = "gure_etxea_datuak_v1";
+
+function gordeDatuak() {
+    try {
+        localStorage.setItem(DATUEN_GAKOA, JSON.stringify({
+            platerak: platerak.map(p => ({ ...p, irudia: null, pdf: null })),
+            osagaienKatalogoa,
+            astePlangintza,
+            erosketaZerrenda,
+            dataGarrantzitsuak
+        }));
+    } catch (errorea) {
+        console.warn("Ezin izan dira datuak gorde:", errorea);
+    }
+}
+
+function kargatuDatuak() {
+    try {
+        const gordeta = localStorage.getItem(DATUEN_GAKOA);
+        if (!gordeta) return;
+        const datuak = JSON.parse(gordeta);
+        platerak = Array.isArray(datuak.platerak) ? datuak.platerak : [];
+        platerak.forEach(p => { if (typeof p.denbora !== "string") p.denbora = ""; });
+        osagaienKatalogoa = Array.isArray(datuak.osagaienKatalogoa) ? datuak.osagaienKatalogoa : [];
+        astePlangintza = datuak.astePlangintza || {};
+        erosketaZerrenda = Array.isArray(datuak.erosketaZerrenda) ? datuak.erosketaZerrenda : [];
+        dataGarrantzitsuak = Array.isArray(datuak.dataGarrantzitsuak) ? datuak.dataGarrantzitsuak : [];
+    } catch (errorea) {
+        console.warn("Ezin izan dira datuak kargatu:", errorea);
+    }
+}
+
+kargatuDatuak();
+
+const plangintzaAukerak = [
+    "Tupperra",
+    "Soberakinak",
+    "Kanpoan jan",
+    "Etxean jan - beste bat",
+    "Ezer ez"
+];
+
+// ========================================
+// ATALAK
+// ========================================
+function erakutsiAtala(atala) {
+    const edukia = document.getElementById("edukia");
+    if (atala === "platerak") erakutsiPlaterak();
+    else if (atala === "plangintza") erakutsiPlangintza();
+    else if (atala === "erosketa") erakutsiErosketaZerrenda();
+    else if (atala === "musika") edukia.innerHTML = `<h2>🎵 Erreprodukzio-zerrendak</h2><p>Aurrerago egingo dugu atal hau.</p>`;
+    else if (atala === "datak") erakutsiDataGarrantzitsuak();
+}
+
+// ========================================
+// GOOGLE CALENDAR
+// ========================================
+let googleTokenClient = null;
+let googleGapiPrest = false;
+let googleGisPrest = false;
+let calendarHilabetea = new Date();
+let calendarEkitaldiak = [];
+
+function erakutsiDataGarrantzitsuak() {
+    const edukia = document.getElementById("edukia");
+    edukia.innerHTML = `
+        <h2>❤️ Google Calendar</h2>
+        <p>Hemen etxeko Google Calendar-eko ekitaldiak ikusiko ditugu.</p>
+        <p><strong>Irakurtzeko soilik:</strong> aplikazio honek ez du ekitaldirik sortu, aldatu edo ezabatuko.</p>
+        <div class="calendarTresnak">
+            <button onclick="googleCalendarSaioaHasi()">🔐 Google Calendar konektatu</button>
+            <button onclick="googleCalendarEguneratu()">🔄 Eguneratu</button>
+            <button onclick="calendarAurrekoa()">⬅️</button>
+            <strong id="calendarHilabeteIzenburua"></strong>
+            <button onclick="calendarHurrengoa()">➡️</button>
+            <button onclick="calendarGaur()">📍 Gaur</button>
+        </div>
+        <div id="googleCalendarMezua" class="calendarMezua"></div>
+        <div id="googleCalendarTaula"></div>
+    `;
+    prestatuGoogleCalendar();
+}
+
+function prestatuGoogleCalendar() {
+    if (typeof gapi === "undefined" || typeof google === "undefined") {
+        setTimeout(prestatuGoogleCalendar, 300);
+        return;
+    }
+    if (!googleGapiPrest) {
+        gapi.load("client", async () => {
+            try {
+                await gapi.client.init({
+                    apiKey: GOOGLE_API_KEY,
+                    discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"]
+                });
+                googleGapiPrest = true;
+                prestatuGoogleTokena();
+            } catch (errorea) {
+                erakutsiGoogleCalendarMezua("Ezin izan da Google Calendar prestatu. Egiaztatu API Key-a.");
+            }
+        });
+    } else {
+        prestatuGoogleTokena();
+    }
+}
+
+function prestatuGoogleTokena() {
+    if (googleGisPrest) return;
+    if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.includes("SARTU_")) {
+        erakutsiGoogleCalendarMezua("Google Calendar konektatzeko, ireki <strong>google-konfigurazioa.js</strong> eta sartu Google Cloud-eko Client ID eta API Key-a.");
+        marraztuCalendarHutsa();
+        return;
+    }
+    googleTokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: "https://www.googleapis.com/auth/calendar.readonly",
+        callback: ""
+    });
+    googleGisPrest = true;
+}
+
+function googleCalendarSaioaHasi() {
+    if (!googleTokenClient) {
+        prestatuGoogleCalendar();
+        setTimeout(googleCalendarSaioaHasi, 500);
+        return;
+    }
+    googleTokenClient.callback = async (erantzuna) => {
+        if (erantzuna.error) {
+            erakutsiGoogleCalendarMezua("Ezin izan da Google Calendar konektatu.");
+            return;
+        }
+        erakutsiGoogleCalendarMezua("Google Calendar konektatuta. Ekitaldiak kargatzen...");
+        await googleCalendarEguneratu();
+    };
+    googleTokenClient.requestAccessToken({ prompt: "consent" });
+}
+
+async function googleCalendarEguneratu() {
+    if (!googleGapiPrest) {
+        erakutsiGoogleCalendarMezua("Lehenengo konektatu Google Calendar.");
+        return;
+    }
+    const tokena = gapi.client.getToken();
+    if (!tokena || !tokena.access_token) {
+        erakutsiGoogleCalendarMezua("Lehenengo sakatu 'Google Calendar konektatu'.");
+        return;
+    }
+
+    const lehenEguna = new Date(calendarHilabetea.getFullYear(), calendarHilabetea.getMonth(), 1, 0, 0, 0);
+    const azkenEguna = new Date(calendarHilabetea.getFullYear(), calendarHilabetea.getMonth() + 1, 1, 0, 0, 0);
+
+    try {
+        const erantzuna = await gapi.client.calendar.events.list({
+            calendarId: "primary",
+            timeMin: lehenEguna.toISOString(),
+            timeMax: azkenEguna.toISOString(),
+            showDeleted: false,
+            singleEvents: true,
+            orderBy: "startTime",
+            maxResults: 2500
+        });
+        calendarEkitaldiak = erantzuna.result.items || [];
+        erakutsiGoogleCalendarMezua(`${calendarEkitaldiak.length} ekitaldi kargatu dira.`);
+        marraztuGoogleCalendar();
+    } catch (errorea) {
+        console.error(errorea);
+        erakutsiGoogleCalendarMezua("Ezin izan dira Calendar-eko ekitaldiak kargatu. Egiaztatu baimenak eta konfigurazioa.");
+    }
+}
+
+function erakutsiGoogleCalendarMezua(mezua) {
+    const elementua = document.getElementById("googleCalendarMezua");
+    if (elementua) elementua.innerHTML = mezua;
+}
+
+function calendarAurrekoa() {
+    calendarHilabetea = new Date(calendarHilabetea.getFullYear(), calendarHilabetea.getMonth() - 1, 1);
+    marraztuGoogleCalendar();
+    if (gapi.client.getToken()) googleCalendarEguneratu();
+}
+
+function calendarHurrengoa() {
+    calendarHilabetea = new Date(calendarHilabetea.getFullYear(), calendarHilabetea.getMonth() + 1, 1);
+    marraztuGoogleCalendar();
+    if (gapi.client.getToken()) googleCalendarEguneratu();
+}
+
+function calendarGaur() {
+    calendarHilabetea = new Date();
+    marraztuGoogleCalendar();
+    if (gapi.client.getToken()) googleCalendarEguneratu();
+}
+
+function marraztuCalendarHutsa() {
+    calendarEkitaldiak = [];
+    marraztuGoogleCalendar();
+}
+
+function marraztuGoogleCalendar() {
+    const taula = document.getElementById("googleCalendarTaula");
+    const izenburua = document.getElementById("calendarHilabeteIzenburua");
+    if (!taula || !izenburua) return;
+
+    const hilabeteIzenak = ["Urtarrila", "Otsaila", "Martxoa", "Apirila", "Maiatza", "Ekaina", "Uztaila", "Abuztua", "Iraila", "Urria", "Azaroa", "Abendua"];
+    izenburua.textContent = `${hilabeteIzenak[calendarHilabetea.getMonth()]} ${calendarHilabetea.getFullYear()}`;
+
+    const egunIzenak = ["Astelehena", "Asteartea", "Asteazkena", "Osteguna", "Ostirala", "Larunbata", "Igandea"];
+    let html = `<div class="calendarGrid">`;
+    egunIzenak.forEach(e => html += `<div class="calendarGoiburua">${e}</div>`);
+
+    const lehenEguna = new Date(calendarHilabetea.getFullYear(), calendarHilabetea.getMonth(), 1);
+    let hasierakoPos = lehenEguna.getDay();
+    hasierakoPos = hasierakoPos === 0 ? 6 : hasierakoPos - 1;
+    const egunKopurua = new Date(calendarHilabetea.getFullYear(), calendarHilabetea.getMonth() + 1, 0).getDate();
+    const aurrekoHilabetekoEgunak = new Date(calendarHilabetea.getFullYear(), calendarHilabetea.getMonth(), 0).getDate();
+    const gelaxkaKopurua = Math.ceil((hasierakoPos + egunKopurua) / 7) * 7;
+
+    for (let pos = 0; pos < gelaxkaKopurua; pos++) {
+        const egunZenbakia = pos - hasierakoPos + 1;
+        let dataObj;
+        let besteHilabete = false;
+        if (egunZenbakia < 1) {
+            dataObj = new Date(calendarHilabetea.getFullYear(), calendarHilabetea.getMonth() - 1, aurrekoHilabetekoEgunak + egunZenbakia);
+            besteHilabete = true;
+        } else if (egunZenbakia > egunKopurua) {
+            dataObj = new Date(calendarHilabetea.getFullYear(), calendarHilabetea.getMonth() + 1, egunZenbakia - egunKopurua);
+            besteHilabete = true;
+        } else {
+            dataObj = new Date(calendarHilabetea.getFullYear(), calendarHilabetea.getMonth(), egunZenbakia);
+        }
+
+        // Data lokala erabiltzen dugu. toISOString() UTC-ra bihurtzen denez,
+        // ordu-zona batzuetan gaurko eguna biharko bezala ager daiteke.
+        const dataGakoaLokala = data => `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}-${String(data.getDate()).padStart(2, "0")}`;
+        const gakoa = dataGakoaLokala(dataObj);
+        const gaurGakoa = dataGakoaLokala(new Date());
+        const klaseak = ["calendarEguna"];
+        if (besteHilabete) klaseak.push("besteHilabete");
+        if (gakoa === gaurGakoa) klaseak.push("gaur");
+
+        const egunekoak = calendarEkitaldiak.filter(e => calendarEkitaldiarenData(e) === gakoa);
+        html += `<div class="${klaseak.join(" ")}"><div class="calendarEgunZenbakia">${dataObj.getDate()}</div>`;
+        egunekoak.forEach(e => {
+            const ordua = e.start?.dateTime ? new Date(e.start.dateTime).toLocaleTimeString("eu-ES", {hour: "2-digit", minute: "2-digit"}) : "Egun osoa";
+            html += `<div class="calendarEkitaldia" title="${ihesHtml(e.summary || "Ekitaldia")}"><strong>${ihesHtml(e.summary || "(Izenik gabe)")}</strong><br><small>${ordua}</small></div>`;
+        });
+        html += `</div>`;
+    }
+    html += `</div>`;
+    taula.innerHTML = html;
+}
+
+function calendarEkitaldiarenData(ekitaldia) {
+    if (ekitaldia.start?.dateTime) return ekitaldia.start.dateTime.slice(0, 10);
+    return ekitaldia.start?.date || "";
+}
+
+// ========================================
+// PLATERAK
+// ========================================
+function erakutsiPlaterak() {
+    const edukia = document.getElementById("edukia");
+    const kategoriak = [...new Set(platerak.map(p => p.kategoria).filter(Boolean))];
+    const etiketak = [...new Set(platerak.flatMap(p => p.etiketak || []))];
+
+    edukia.innerHTML = `<h2>🍽️ Platerak</h2>
+        <button onclick="erakutsiPlaterBerria()">➕ Plater berria</button>
+        <button onclick="erakutsiOsagaienKatalogoa()">🥕 Osagaien katalogoa</button>
+        <div class="platerIragazkiak">
+            <input type="search" id="platerBilaketa" placeholder="🔎 Bilatu platera..." oninput="iragaziPlaterak()">
+            <select id="platerKategoriaIragazkia" onchange="iragaziPlaterak()">
+                <option value="">📂 Kategoria guztiak</option>
+                ${kategoriak.map(k => `<option value="${k}">${k}</option>`).join("")}
+            </select>
+            <select id="platerEtiketaIragazkia" onchange="iragaziPlaterak()">
+                <option value="">🏷️ Etiketa guztiak</option>
+                ${etiketak.map(e => `<option value="${e}">${e}</option>`).join("")}
+            </select>
+            <select id="platerDenboraIragazkia" onchange="iragaziPlaterak()">
+                <option value="">⏱️ Denbora guztiak</option>
+                <option value="15">15 min edo gutxiago</option>
+                <option value="30">30 min edo gutxiago</option>
+                <option value="60">1 ordu edo gutxiago</option>
+                <option value="120">2 ordu edo gutxiago</option>
+            </select>
+            <label class="gogokoIragazkia"><input type="checkbox" id="gogokoakBakarrik" onchange="iragaziPlaterak()"> ❤️ Gogokoak bakarrik</label>
+        </div>
+        <div id="platerenZerrenda">${sortuPlaterenZerrenda()}</div>`;
+}
+
+function iragaziPlaterak() {
+    const bilaketa = (document.getElementById("platerBilaketa")?.value || "").trim().toLowerCase();
+    const kategoria = document.getElementById("platerKategoriaIragazkia")?.value || "";
+    const etiketa = document.getElementById("platerEtiketaIragazkia")?.value || "";
+    const denboraMax = Number(document.getElementById("platerDenboraIragazkia")?.value || 0);
+    const gogokoak = document.getElementById("gogokoakBakarrik")?.checked || false;
+    const emaitzak = platerak.map((p, i) => ({p, i})).filter(({p}) => {
+        const izenEgokia = !bilaketa || p.izena.toLowerCase().includes(bilaketa);
+        const kategoriaEgokia = !kategoria || p.kategoria === kategoria;
+        const etiketaEgokia = !etiketa || (p.etiketak || []).includes(etiketa);
+        const gogokoEgokia = !gogokoak || (p.etiketak || []).includes("Gogokoa");
+        const minutuak = lortuDenboraMinutuetan(p.denbora);
+        const denboraEgokia = !denboraMax || (minutuak !== null && minutuak <= denboraMax);
+        return izenEgokia && kategoriaEgokia && etiketaEgokia && gogokoEgokia && denboraEgokia;
+    });
+    document.getElementById("platerenZerrenda").innerHTML = sortuPlaterenZerrenda(emaitzak);
+}
+
+function lortuDenboraMinutuetan(denbora) {
+    if (!denbora) return null;
+    const testua = String(denbora).toLowerCase().trim();
+    const orduak = testua.match(/(\d+(?:[.,]\d+)?)\s*(ordu|h|hours?)/);
+    const minutuak = testua.match(/(\d+(?:[.,]\d+)?)\s*(minutu|min|m|minutes?)/);
+    let guztira = 0;
+    if (orduak) guztira += parseFloat(orduak[1].replace(',', '.')) * 60;
+    if (minutuak) guztira += parseFloat(minutuak[1].replace(',', '.'));
+    if (guztira > 0) return guztira;
+    const zenbakia = testua.match(/\d+(?:[.,]\d+)?/);
+    return zenbakia ? parseFloat(zenbakia[0].replace(',', '.')) : null;
+}
+
+function erakutsiPlaterBerria() {
+    const edukia = document.getElementById("edukia");
+    edukia.innerHTML = `<h2>🍽️ Plater berria</h2>
+        <label>Plateraren izena:</label><br>
+        <input type="text" id="platerIzena" placeholder="Adib. Makarroiak"><br><br>
+        <label>🖼️ Plateraren irudia:</label><br><br>
+        <input type="file" id="platerIrudia" accept="image/*"><br><br>
+        <label>📄 PDFko errezeta:</label><br><br>
+        <input type="file" id="platerPdf" accept="application/pdf"><br><br>
+        <label>Kategoria:</label><br>
+        <select id="platerKategoria"><option value="Lehenengoa">Lehenengoa</option><option value="Bigarrena">Bigarrena</option><option value="Postrea">Postrea</option></select><br><br>        <label>⏱️ Denbora (aukerakoa):</label><br>
+        <input type="text" id="platerDenbora" placeholder="Adib. 30 minutu"><br><br>
+
+        <h3>🏷️ Etiketak</h3>
+        ${etiketaCheckbox("Begetarianoa", "etiketa")}
+        ${etiketaCheckbox("Beganoa", "etiketa")}
+        ${etiketaCheckbox("Glutenik gabea", "etiketa")}
+        ${etiketaCheckbox("Laktosarik gabea", "etiketa")}
+        ${etiketaCheckbox("Gogokoa", "etiketa", "❤️ ")}<br>
+        <h3>🥕 Osagaiak</h3>
+        <div id="osagaienZerrenda">${sortuOsagaiBerria()}</div>
+        <br><button onclick="gehituOsagaia()">➕ Beste osagai bat</button><br><br>
+        <button onclick="gordePlatera()">💾 Gorde platera</button>
+        <button onclick="erakutsiPlaterak()">↩️ Itzuli</button>`;
+}
+
+function etiketaCheckbox(izena, klasea, aurrekoa = "") {
+    return `<label><input type="checkbox" value="${izena}" class="${klasea}">${aurrekoa}${izena}</label><br>`;
+}
+
+function sortuOsagaiBerria() {
+    let aukerak = `<option value="">Aukeratu osagaia</option>`;
+    osagaienKatalogoa.forEach((osagaia, indizea) => aukerak += `<option value="${indizea}">${osagaia.izena}</option>`);
+    return `<div class="osagaia"><select class="osagaiKatalogokoAukera" onchange="aldatuOsagaiMota(this)">${aukerak}<option value="BERRIA">➕ Osagai berria...</option></select>
+        <input type="text" class="osagaiBerriarenIzena" placeholder="Osagai berriaren izena" style="display:none">
+        <input type="number" class="osagaiKantitatea" placeholder="Kantitatea" min="0" step="any">${sortuUnitateEremua()}</div>`;
+}
+
+function sortuUnitateEremua(aukeratutakoUnitatea = "") {
+    const arruntak = ["", "g", "kg", "ml", "l", "unitate", "koilarakada"];
+    const berezia = aukeratutakoUnitatea !== "" && !arruntak.includes(aukeratutakoUnitatea);
+    return `<select class="osagaiUnitatea" onchange="aldatuUnitatea(this)">
+        <option value="" ${aukeratutakoUnitatea === "" ? "selected" : ""}>Unitaterik gabe</option>
+        <option value="g" ${aukeratutakoUnitatea === "g" ? "selected" : ""}>g</option>
+        <option value="kg" ${aukeratutakoUnitatea === "kg" ? "selected" : ""}>kg</option>
+        <option value="ml" ${aukeratutakoUnitatea === "ml" ? "selected" : ""}>ml</option>
+        <option value="l" ${aukeratutakoUnitatea === "l" ? "selected" : ""}>l</option>
+        <option value="unitate" ${aukeratutakoUnitatea === "unitate" ? "selected" : ""}>unitate</option>
+        <option value="koilarakada" ${aukeratutakoUnitatea === "koilarakada" ? "selected" : ""}>koilarakada</option>
+        <option value="BEREZIA" ${berezia ? "selected" : ""}>✏️ Beste unitate bat...</option>
+    </select><input type="text" class="osagaiUnitateBerezia" placeholder="Adib. cm, koilaratxo..." value="${berezia ? aukeratutakoUnitatea : ""}" style="display:${berezia ? "inline-block" : "none"}">`;
+}
+
+function aldatuUnitatea(selecta) {
+    const input = selecta.parentElement.querySelector(".osagaiUnitateBerezia");
+    if (selecta.value === "BEREZIA") { input.style.display = "inline-block"; input.focus(); }
+    else { input.style.display = "none"; input.value = ""; }
+}
+
+function aldatuOsagaiMota(selecta) {
+    const input = selecta.parentElement.querySelector(".osagaiBerriarenIzena");
+    if (selecta.value === "BERRIA") { input.style.display = "inline-block"; input.focus(); }
+    else { input.style.display = "none"; input.value = ""; }
+}
+
+function gehituOsagaia() {
+    const zerrenda = document.getElementById("osagaienZerrenda");
+    const osagaia = document.createElement("div"); osagaia.className = "osagaia";
+    let aukerak = `<option value="">Aukeratu osagaia</option>`;
+    osagaienKatalogoa.forEach((o, i) => aukerak += `<option value="${i}">${o.izena}</option>`);
+    osagaia.innerHTML = `<br><select class="osagaiKatalogokoAukera" onchange="aldatuOsagaiMota(this)">${aukerak}<option value="BERRIA">➕ Osagai berria...</option></select>
+        <input type="text" class="osagaiBerriarenIzena" placeholder="Osagai berriaren izena" style="display:none">
+        <input type="number" class="osagaiKantitatea" placeholder="Kantitatea" min="0" step="any">${sortuUnitateEremua()}
+        <button type="button" onclick="this.parentElement.remove()">❌</button>`;
+    zerrenda.appendChild(osagaia);
+}
+
+function lortuEdoSortuOsagaia(izena) {
+    const garbitua = izena.trim(); if (!garbitua) return null;
+    const aurkitua = osagaienKatalogoa.find(o => o.izena.toLowerCase() === garbitua.toLowerCase());
+    if (aurkitua) return aurkitua;
+    const berria = { id: Date.now() + Math.random(), izena: garbitua };
+    osagaienKatalogoa.push(berria); return berria;
+}
+
+function lortuOsagaiUnitatea(osagaia) {
+    const selecta = osagaia.querySelector(".osagaiUnitatea"); if (!selecta) return "";
+    if (selecta.value === "BEREZIA") return osagaia.querySelector(".osagaiUnitateBerezia")?.value.trim() || "";
+    return selecta.value;
+}
+
+function irakurriOsagaiak(zerrendaSelector) {
+    const emaitza = [];
+    document.querySelectorAll(`${zerrendaSelector} .osagaia`).forEach(osagaia => {
+        const aukeraketa = osagaia.querySelector(".osagaiKatalogokoAukera");
+        const kantitatea = osagaia.querySelector(".osagaiKantitatea")?.value || "";
+        const unitatea = lortuOsagaiUnitatea(osagaia);
+        let katalogokoOsagaia = null;
+        if (aukeraketa && aukeraketa.value && aukeraketa.value !== "BERRIA") katalogokoOsagaia = osagaienKatalogoa[Number(aukeraketa.value)];
+        else if (aukeraketa?.value === "BERRIA") katalogokoOsagaia = lortuEdoSortuOsagaia(osagaia.querySelector(".osagaiBerriarenIzena")?.value || "");
+        if (katalogokoOsagaia) emaitza.push({ osagaiaId:katalogokoOsagaia.id, izena:katalogokoOsagaia.izena, kantitatea:kantitatea === "" ? null : Number(kantitatea), unitatea });
+    });
+    return emaitza;
+}
+
+function gordePlatera() {
+    const izena = document.getElementById("platerIzena").value;
+    const pdf = document.getElementById("platerPdf").files[0];
+    if (!izena.trim()) return alert("Mesedez, idatzi plateraren izena.");
+    if (pdf && pdf.type !== "application/pdf") return alert("Mesedez, aukeratu PDF fitxategi bat.");
+    const etiketak = [...document.querySelectorAll(".etiketa:checked")].map(e => e.value);
+    const irudia = document.getElementById("platerIrudia").files[0];
+    platerak.push({ id:Date.now(), izena:izena.trim(), kategoria:document.getElementById("platerKategoria").value, denbora:document.getElementById("platerDenbora")?.value.trim() || "", etiketak, osagaiak:irakurriOsagaiak("#osagaienZerrenda"), irudia:irudia ? URL.createObjectURL(irudia) : null, pdf:pdf ? URL.createObjectURL(pdf) : null });
+    gordeDatuak();
+    alert("Platera gordeta! 🍽️"); erakutsiPlaterak();
+}
+
+function sortuPlaterenZerrenda(emaitzak = platerak.map((p, i) => ({p, i}))) {
+    if (!emaitzak.length) return `<p>Ez da platerik aurkitu.</p>`;
+    return emaitzak.map(({p, i}) => `<div class="platera" onclick="erakutsiPlaterarenXehetasunak(${i})" style="cursor:pointer">
+        ${p.irudia ? `<img src="${p.irudia}" alt="${p.izena}" class="platerIrudia">` : ""}
+        <h3>${p.izena}</h3>
+        <p>📂 ${p.kategoria}${p.denbora ? ` · ⏱️ ${p.denbora}` : ""}</p>
+        ${(p.etiketak || []).includes("Gogokoa") ? `<span>❤️ Gogokoa</span>` : ""}
+    </div>`).join("");
+}
+
+function erakutsiPlaterarenXehetasunak(i) {
+    const p = platerak[i];
+    const osagaiak = p.osagaiak.length ? `<ul>${p.osagaiak.map(o => `<li>${o.izena}${o.kantitatea !== null || o.unitatea ? ` — ${[o.kantitatea,o.unitatea].filter(x => x !== null && x !== "").join(" ")}` : ""}</li>`).join("")}</ul>` : `<p>Ez dago osagairik gehituta.</p>`;
+    const etiketak = p.etiketak.length ? p.etiketak.map(e => `<span>🏷️ ${e}</span>`).join(" &nbsp;") : `<p>Ez dago etiketarik.</p>`;
+    const denbora = p.denbora ? `<h3>⏱️ Denbora</h3><p>${p.denbora}</p>` : "";
+    const pdf = p.pdf ? `<h3>📄 Errezeta</h3><button onclick="irekiPdfa('${p.pdf}')">📄 PDFa ireki</button>` : "";
+    document.getElementById("edukia").innerHTML = `<button onclick="erakutsiPlaterak()">↩️ Plateretara itzuli</button><h2>🍽️ ${p.izena}</h2>${p.irudia ? `<img src="${p.irudia}" alt="${p.izena}" class="platerIrudia">` : ""}<h3>📂 Kategoria</h3><p>${p.kategoria}</p>${denbora}<h3>🏷️ Etiketak</h3><p>${etiketak}</p><h3>🥕 Osagaiak</h3>${osagaiak}${pdf}<br><br><button onclick="editatuPlatera(${i})">✏️ Editatu platera</button><button onclick="ezabatuPlatera(${i})">🗑️ Ezabatu platera</button>`;
+}
+
+function editatuPlatera(i) {
+    const p = platerak[i];
+    let osagaiak = p.osagaiak.map(o => {
+        let aukerak = `<option value="">Aukeratu osagaia</option>`;
+        osagaienKatalogoa.forEach((k,j) => aukerak += `<option value="${j}" ${k.id===o.osagaiaId?"selected":""}>${k.izena}</option>`);
+        return `<div class="osagaia"><br><select class="osagaiKatalogokoAukera" onchange="aldatuOsagaiMota(this)">${aukerak}<option value="BERRIA">➕ Osagai berria...</option></select><input type="text" class="osagaiBerriarenIzena" placeholder="Osagai berriaren izena" style="display:none"><input type="number" class="osagaiKantitatea" value="${o.kantitatea===null?"":o.kantitatea}" min="0" step="any">${sortuUnitateEremua(o.unitatea)}<button type="button" onclick="this.parentElement.remove()">❌</button></div>`;
+    }).join("") || sortuOsagaiBerria();
+    document.getElementById("edukia").innerHTML = `<h2>✏️ Platera editatu</h2><label>Plateraren izena:</label><br><input type="text" id="editatuPlaterIzena" value="${p.izena}"><br><br><label>Kategoria:</label><br><select id="editatuPlaterKategoria"><option value="Lehenengoa" ${p.kategoria==="Lehenengoa"?"selected":""}>Lehenengoa</option><option value="Bigarrena" ${p.kategoria==="Bigarrena"?"selected":""}>Bigarrena</option><option value="Postrea" ${p.kategoria==="Postrea"?"selected":""}>Postrea</option></select><br><br><label>⏱️ Denbora (aukerakoa):</label><br><input type="text" id="editatuPlaterDenbora" value="${p.denbora || ""}" placeholder="Adib. 30 minutu"><br><br><h3>🏷️ Etiketak</h3>${["Begetarianoa","Beganoa","Glutenik gabea","Laktosarik gabea","Gogokoa"].map(e=>`<label><input type="checkbox" value="${e}" class="editatuEtiketa" ${p.etiketak.includes(e)?"checked":""}>${e}</label><br>`).join("")}<h3>🥕 Osagaiak</h3><div id="editatuOsagaienZerrenda">${osagaiak}</div><br><button onclick="gehituEditatuOsagaia()">➕ Beste osagai bat</button><br><br><button onclick="gordeEditatutakoPlatera(${i})">💾 Aldaketak gorde</button><button onclick="erakutsiPlaterarenXehetasunak(${i})">↩️ Utzi</button>`;
+}
+
+function gehituEditatuOsagaia() {
+    const z = document.getElementById("editatuOsagaienZerrenda"), d = document.createElement("div"); d.className="osagaia";
+    let a=`<option value="">Aukeratu osagaia</option>`; osagaienKatalogoa.forEach((o,i)=>a+=`<option value="${i}">${o.izena}</option>`);
+    d.innerHTML=`<br><select class="osagaiKatalogokoAukera" onchange="aldatuOsagaiMota(this)">${a}<option value="BERRIA">➕ Osagai berria...</option></select><input type="text" class="osagaiBerriarenIzena" placeholder="Osagai berriaren izena" style="display:none"><input type="number" class="osagaiKantitatea" placeholder="Kantitatea" min="0" step="any">${sortuUnitateEremua()}<button type="button" onclick="this.parentElement.remove()">❌</button>`; z.appendChild(d);
+}
+
+function gordeEditatutakoPlatera(i) {
+    const p=platerak[i], izena=document.getElementById("editatuPlaterIzena").value;
+    if(!izena.trim()) return alert("Mesedez, idatzi plateraren izena.");
+    p.izena=izena.trim(); p.kategoria=document.getElementById("editatuPlaterKategoria").value; p.denbora=document.getElementById("editatuPlaterDenbora")?.value.trim() || ""; p.etiketak=[...document.querySelectorAll(".editatuEtiketa:checked")].map(e=>e.value); p.osagaiak=irakurriOsagaiak("#editatuOsagaienZerrenda"); gordeDatuak();
+    alert("Platera eguneratu da! ✅"); erakutsiPlaterarenXehetasunak(i);
+}
+
+function ezabatuPlatera(i) {
+    const p=platerak[i]; if(!confirm(`Ziur zaude "${p.izena}" ezabatu nahi duzula?`)) return;
+    if(p.irudia) URL.revokeObjectURL(p.irudia); if(p.pdf) URL.revokeObjectURL(p.pdf); platerak.splice(i,1); gordeDatuak(); alert("Platera ezabatu da. 🗑️"); erakutsiPlaterak();
+}
+function irekiPdfa(url){ window.open(url,"_blank"); }
+
+// ========================================
+// KATALOGOA
+// ========================================
+function erakutsiOsagaienKatalogoa() {
+    const z = osagaienKatalogoa.length ? osagaienKatalogoa.map((o,i)=>`<div class="platera"><h3>🥕 ${o.izena}</h3><button onclick="ezabatuKatalogokoOsagaia(${i})">🗑️ Ezabatu</button></div>`).join("") : `<p>Oraindik ez dago osagairik katalogoan.</p>`;
+    document.getElementById("edukia").innerHTML=`<button onclick="erakutsiPlaterak()">↩️ Plateretara itzuli</button><h2>🥕 Osagaien katalogoa</h2><p>Hemen gordeko ditugu etxean erabiltzen ditugun osagai guztiak.</p><h3>➕ Osagai berria</h3><input type="text" id="osagaiBerriarenIzena" placeholder="Adib. Tomatea"><button onclick="gehituKatalogokoOsagaia()">➕ Gehitu</button><div>${z}</div>`;
+}
+function gehituKatalogokoOsagaia(){ const input=document.getElementById("osagaiBerriarenIzena"), izena=input.value.trim(); if(!izena)return alert("Mesedez, idatzi osagaiaren izena."); if(osagaienKatalogoa.some(o=>o.izena.toLowerCase()===izena.toLowerCase()))return alert("Osagai hori dagoeneko katalogoan dago."); osagaienKatalogoa.push({id:Date.now()+Math.random(),izena}); gordeDatuak(); alert(`"${izena}" katalogora gehitu da. 🥕`); erakutsiOsagaienKatalogoa(); }
+function ezabatuKatalogokoOsagaia(i){ const o=osagaienKatalogoa[i]; if(platerak.some(p=>p.osagaiak.some(po=>po.osagaiaId===o.id))) return alert("Osagai hau plater batean erabiltzen ari da. Lehenengo plater horretatik kendu behar duzu."); if(!confirm(`Ziur zaude "${o.izena}" ezabatu nahi duzula?`))return; osagaienKatalogoa.splice(i,1); gordeDatuak(); erakutsiOsagaienKatalogoa(); }
+
+// ========================================
+// ASTE-PLANGINTZA
+// ========================================
+function erakutsiPlangintza(){
+    const edukia=document.getElementById("edukia"), astea=lortuAsteHasiera(new Date());
+    const egunak=["Astelehena","Asteartea","Asteazkena","Osteguna","Ostirala","Larunbata","Igandea"];
+    let html=`<h2>📅 Aste-plangintza</h2><p>Aukeratu egun bakoitzeko bazkaria eta afaria.</p>`;
+    egunak.forEach((izena,i)=>{ const data=gehituEgunak(astea,i), g=dataGakoaSortu(data); html+=`<div class="platera"><h3>${izena} — ${formatuData(data)}</h3><label>🍽️ Bazkaria:</label><br>${sortuPlangintzaAukera(g,"bazkaria")}<br><br><label>🌙 Afaria:</label><br>${sortuPlangintzaAukera(g,"afaria")}</div>`; });
+    html+=`<br><button onclick="gordePlangintza()">💾 Gorde astea</button><button onclick="sortuErosketaZerrendaAstetik()">🛒 Erosketa-zerrenda sortu</button>`; edukia.innerHTML=html;
+}
+function lortuAsteHasiera(data){ const e=new Date(data), eguna=e.getDay(), d=eguna===0?-6:1-eguna; e.setDate(e.getDate()+d); e.setHours(0,0,0,0); return e; }
+function gehituEgunak(data,n){ const e=new Date(data); e.setDate(e.getDate()+n); return e; }
+function dataGakoaSortu(data){ return `${data.getFullYear()}-${String(data.getMonth()+1).padStart(2,"0")}-${String(data.getDate()).padStart(2,"0")}`; }
+function formatuData(data){ return `${String(data.getDate()).padStart(2,"0")}/${String(data.getMonth()+1).padStart(2,"0")}`; }
+function sortuPlangintzaAukera(dataGakoa,otordua){
+    const gakoa=`${dataGakoa}_${otordua}`, gordeta=astePlangintza[gakoa]; let h=`<select id="plangintza_${gakoa}"><option value="">Aukeratu...</option>`;
+    if(platerak.length){ h+=`<optgroup label="🍽️ Platerak">`; platerak.forEach(p=>h+=`<option value="PLATERA:${p.id}" ${gordeta===`PLATERA:${p.id}`?"selected":""}>${p.izena}</option>`); h+=`</optgroup>`; }
+    h+=`<optgroup label="🏠 Beste aukerak">`; plangintzaAukerak.forEach(a=>{ const balioa=`BESTEA:${a}`, ikonoa=a==="Tupperra"?"🥡 ":a==="Soberakinak"?"♻️ ":a==="Kanpoan jan"?"🍴 ":a==="Etxean jan - beste bat"?"🏠 ":"— "; h+=`<option value="${balioa}" ${gordeta===balioa?"selected":""}>${ikonoa}${a}</option>`; }); return h+`</optgroup></select>`;
+}
+function gordePlangintza(){
+    const astea=lortuAsteHasiera(new Date());
+    for(let i=0;i<7;i++){ const g=dataGakoaSortu(gehituEgunak(astea,i)); for(const o of ["bazkaria","afaria"]){ const el=document.getElementById(`plangintza_${g}_${o}`); if(!el)continue; const k=`${g}_${o}`; if(el.value)astePlangintza[k]=el.value; else delete astePlangintza[k]; } }
+    gordeDatuak();
+    alert("Aste-plangintza gordeta! 📅✅");
+}
+function sortuErosketaZerrendaAstetik(){
+    gordePlangintza();
+    const batuak = {};
+
+    Object.values(astePlangintza).forEach(aukera => {
+        if (!aukera.startsWith("PLATERA:")) return;
+        const id = aukera.substring("PLATERA:".length);
+        const p = platerak.find(x => String(x.id) === id);
+        if (!p) return;
+
+        p.osagaiak.forEach(o => {
+            const k = o.osagaiaId;
+            if (!batuak[k]) {
+                batuak[k] = {
+                    id: k,
+                    izena: o.izena,
+                    kantitatea: 0,
+                    unitatea: o.unitatea || "",
+                    kantitateaDago: false
+                };
+            }
+
+            if (o.kantitatea !== null && o.kantitatea !== "" && batuak[k].unitatea === (o.unitatea || "")) {
+                batuak[k].kantitatea += Number(o.kantitatea);
+                batuak[k].kantitateaDago = true;
+            }
+        });
+    });
+
+    const aurrekoMarkatuak = new Map(erosketaZerrenda.map(o => [String(o.id), !!o.eginda]));
+    erosketaZerrenda = Object.values(batuak).map(o => ({
+        ...o,
+        eginda: aurrekoMarkatuak.get(String(o.id)) || false
+    }));
+
+    gordeDatuak();
+    erakutsiErosketaZerrenda();
+}
+
+function erakutsiErosketaZerrenda(){
+    const edukia = document.getElementById("edukia");
+
+    if (!erosketaZerrenda.length) {
+        edukia.innerHTML = `<h2>🛒 Erosketa-zerrenda</h2>
+            <p>Oraindik ez dago erosketen zerrendarik.</p>
+            <button onclick="erakutsiPlangintza()">📅 Aste-plangintza</button>`;
+        return;
+    }
+
+    const zerrenda = erosketaZerrenda.map((o, i) => {
+        let neurketa = "";
+        if (o.kantitateaDago) neurketa = ` — ${o.kantitatea} ${o.unitatea}`;
+        else if (o.unitatea) neurketa = ` — ${o.unitatea}`;
+        return `<li>
+            <label>
+                <input type="checkbox" ${o.eginda ? "checked" : ""} onchange="aldatuErosketaMarka(${i}, this.checked)">
+                ${o.izena}${neurketa}
+            </label>
+        </li>`;
+    }).join("");
+
+    edukia.innerHTML = `<h2>🛒 Erosketa-zerrenda</h2>
+        <p>Aste-plangintzako plateretatik sortua eta gailu honetan gordeta.</p>
+        <ul>${zerrenda}</ul>
+        <br>
+        <button onclick="sortuErosketaZerrendaAstetik()">🔄 Eguneratu zerrenda</button>
+        <button onclick="garbituErosketaZerrenda()">🗑️ Garbitu</button>
+        <button onclick="erakutsiPlangintza()">📅 Aste-plangintza</button>`;
+}
+
+function aldatuErosketaMarka(indizea, eginda){
+    if (!erosketaZerrenda[indizea]) return;
+    erosketaZerrenda[indizea].eginda = eginda;
+    gordeDatuak();
+}
+
+function garbituErosketaZerrenda(){
+    if (!confirm("Erosketa-zerrenda garbitu nahi duzu?")) return;
+    erosketaZerrenda = [];
+    gordeDatuak();
+    erakutsiErosketaZerrenda();
+}
+
+// ========================================
+// SPOTIFY ERREPRODUKZIO-ZERRENDAK
+// ========================================
+let spotifyZerrendak = [];
+const SPOTIFY_GAKOA = "gure_etxea_spotify_zerrendak_v1";
+
+function kargatuSpotifyZerrendak() {
+    try {
+        const gordeta = localStorage.getItem(SPOTIFY_GAKOA);
+        spotifyZerrendak = gordeta ? JSON.parse(gordeta) : [];
+        if (!Array.isArray(spotifyZerrendak)) spotifyZerrendak = [];
+    } catch (errorea) {
+        spotifyZerrendak = [];
+    }
+}
+
+function gordeSpotifyZerrendak() {
+    localStorage.setItem(SPOTIFY_GAKOA, JSON.stringify(spotifyZerrendak));
+}
+
+kargatuSpotifyZerrendak();
+
+function erakutsiMusika() {
+    const edukia = document.getElementById("edukia");
+
+    let zerrendaHtml = "";
+
+    if (spotifyZerrendak.length === 0) {
+        zerrendaHtml = `<p>Oraindik ez dago Spotify erreprodukzio-zerrendarik.</p>`;
+    } else {
+        zerrendaHtml = spotifyZerrendak.map((zerrenda, indizea) => `
+            <div class="spotifyZerrenda" onclick="irekiSpotifyZerrenda(${indizea})">
+                <div class="spotifyZerrendaIkonoa">🎵</div>
+                <div class="spotifyZerrendaInfoa">
+                    <h3>${ihesTestua(zerrenda.izena)}</h3>
+                    <p>Spotify-n ireki →</p>
+                </div>
+            </div>
+        `).join("");
+    }
+
+    edukia.innerHTML = `
+        <h2>🎵 Erreprodukzio-zerrendak</h2>
+        <p>Klikatu zerrenda batean eta Spotify-n irekiko da.</p>
+
+        <div class="spotifyZerrendenZerrenda">
+            ${zerrendaHtml}
+        </div>
+
+        <hr>
+
+        <h3>➕ Spotify zerrenda gehitu</h3>
+        <input type="text" id="spotifyIzena" placeholder="Adib. Afalosteko musika">
+        <input type="url" id="spotifyEsteka" placeholder="Spotify playlistaren esteka">
+        <button onclick="gehituSpotifyZerrenda()">💾 Gehitu</button>
+    `;
+}
+
+function gehituSpotifyZerrenda() {
+    const izenaInput = document.getElementById("spotifyIzena");
+    const estekaInput = document.getElementById("spotifyEsteka");
+
+    const izena = izenaInput.value.trim();
+    const esteka = estekaInput.value.trim();
+
+    if (!izena) {
+        alert("Idatzi erreprodukzio-zerrendaren izena.");
+        return;
+    }
+
+    if (!esteka.startsWith("https://open.spotify.com/playlist/")) {
+        alert("Spotify playlist baten esteka behar da.");
+        return;
+    }
+
+    spotifyZerrendak.push({
+        id: Date.now(),
+        izena,
+        esteka
+    });
+
+    gordeSpotifyZerrendak();
+    erakutsiMusika();
+}
+
+function irekiSpotifyZerrenda(indizea) {
+    const zerrenda = spotifyZerrendak[indizea];
+    if (!zerrenda) return;
+
+    // Spotify-ren Universal Link-a erabiltzen dugu:
+    // mugikorrean/mahaigainean Spotify aplikazioa badago, sistemak hara bideratu ohi du.
+    window.location.href = zerrenda.esteka;
+}
+
+function ihesTestua(testua) {
+    return String(testua)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// Aurreko erakutsiAtala funtzioaren Spotify atala ordezkatu.
+const _erakutsiAtala = erakutsiAtala;
+erakutsiAtala = function(atala) {
+    if (atala === "musika") {
+        erakutsiMusika();
+        return;
+    }
+    _erakutsiAtala(atala);
+};
+
+// ========================================
+// APLIKAZIOA INSTALATZEA (PWA)
+// ========================================
+let instalatzekoGonbita = null;
+
+window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    instalatzekoGonbita = event;
+    erakutsiInstalatzekoBotoia();
+});
+
+function erakutsiInstalatzekoBotoia() {
+    if (document.getElementById("instalatuAplikazioa")) return;
+
+    const botoia = document.createElement("button");
+    botoia.id = "instalatuAplikazioa";
+    botoia.className = "instalatuAplikazioa";
+    botoia.textContent = "📲 Instalatu Gure etxea";
+    botoia.onclick = instalatuAplikazioa;
+    document.body.appendChild(botoia);
+}
+
+async function instalatuAplikazioa() {
+    if (!instalatzekoGonbita) return;
+
+    instalatzekoGonbita.prompt();
+    await instalatzekoGonbita.userChoice;
+    instalatzekoGonbita = null;
+
+    const botoia = document.getElementById("instalatuAplikazioa");
+    if (botoia) botoia.remove();
+}
+
+window.addEventListener("appinstalled", () => {
+    const botoia = document.getElementById("instalatuAplikazioa");
+    if (botoia) botoia.remove();
+});
+

@@ -1,0 +1,219 @@
+* { box-sizing: border-box; }
+body { margin:0; font-family:Arial,sans-serif; background:#f5f3ef; color:#333; }
+header { text-align:center; padding:40px 20px 25px; }
+header h1 { margin-bottom:10px; font-size:36px; }
+header p { margin:0; color:#777; }
+main { max-width:900px; margin:auto; padding:20px; }
+.menua { display:grid; grid-template-columns:repeat(5,1fr); gap:15px; }
+.menua button { border:none; border-radius:15px; padding:25px 10px; background:white; cursor:pointer; font-size:30px; box-shadow:0 3px 10px rgba(0,0,0,.08); transition:transform .2s; }
+.menua button:hover { transform:translateY(-3px); }
+.menua button span { display:block; margin-top:10px; font-size:15px; }
+#edukia { margin-top:30px; background:white; border-radius:20px; padding:30px; min-height:300px; box-shadow:0 3px 10px rgba(0,0,0,.05); }
+button, input, select { font:inherit; }
+button { border:0; border-radius:10px; padding:10px 14px; margin:4px; cursor:pointer; }
+input, select { padding:9px; border:1px solid #ddd; border-radius:8px; max-width:100%; }
+.platera { margin-top:20px; padding:20px; background:#fafafa; border-radius:15px; }
+.platera h3 { margin:0; font-size:20px; }
+.platerIrudia { width:120px; height:120px; object-fit:cover; border-radius:12px; display:block; margin-bottom:10px; }
+.osagaia { margin:8px 0; }
+@media (max-width:700px) { header h1{font-size:28px;} .menua{grid-template-columns:repeat(2,1fr);} }
+
+
+.asteNabigazioa {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 20px 0 10px;
+    padding: 12px;
+    background: #fafafa;
+    border-radius: 12px;
+}
+
+.asteNabigazioa strong {
+    text-align: center;
+}
+
+@media (max-width: 600px) {
+    .asteNabigazioa {
+        flex-direction: column;
+    }
+}
+
+
+.dataTxartela {
+    margin-top: 15px;
+    padding: 18px;
+    background: #fafafa;
+    border-radius: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+.dataTxartela h3, .dataTxartela p {
+    margin: 5px 0;
+}
+
+.dataTxartela button {
+    margin-left: 5px;
+}
+
+
+/* Google Calendar */
+.calendarTresnak {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin: 20px 0;
+}
+
+.calendarMezua {
+    margin: 10px 0 18px;
+    color: #666;
+}
+
+.calendarGrid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.calendarGoiburua {
+    padding: 10px 6px;
+    text-align: center;
+    font-weight: bold;
+    background: #f0eee9;
+    border-radius: 8px;
+}
+
+.calendarEguna {
+    min-height: 105px;
+    padding: 8px;
+    background: #fafafa;
+    border: 1px solid #e6e2dc;
+    border-radius: 8px;
+}
+
+.calendarEguna.besteHilabete {
+    opacity: 0.4;
+}
+
+.calendarEguna.gaur {
+    border: 2px solid #777;
+}
+
+.calendarEgunZenbakia {
+    font-weight: bold;
+    margin-bottom: 6px;
+}
+
+.calendarEkitaldia {
+    padding: 5px 6px;
+    margin-top: 4px;
+    border-radius: 6px;
+    background: #ece8df;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+    .calendarGrid {
+        gap: 3px;
+    }
+
+    .calendarEguna {
+        min-height: 75px;
+        padding: 4px;
+    }
+
+    .calendarGoiburua {
+        font-size: 12px;
+        padding: 7px 2px;
+    }
+
+    .calendarEkitaldia {
+        font-size: 11px;
+        padding: 4px;
+    }
+}
+
+/* ========================================
+   SPOTIFY
+   ======================================== */
+
+.spotifyZerrendenZerrenda {
+    display: grid;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.spotifyZerrenda {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 16px;
+    background: #fafafa;
+    border-radius: 15px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.spotifyZerrenda:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.spotifyZerrendaIkonoa {
+    width: 55px;
+    height: 55px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #e8e8e8;
+    font-size: 28px;
+    flex-shrink: 0;
+}
+
+.spotifyZerrendaInfoa h3 {
+    margin: 0 0 5px;
+}
+
+.spotifyZerrendaInfoa p {
+    margin: 0;
+    color: #777;
+}
+
+#edukia input[type="url"],
+#edukia input[type="text"] {
+    max-width: 100%;
+    padding: 10px;
+    margin: 5px 5px 5px 0;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+/* ========================================
+   PWA / INSTALATZEKO BOTOIA
+   ======================================== */
+
+.instalatuAplikazioa {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 1000;
+    border: none;
+    border-radius: 14px;
+    padding: 12px 16px;
+    background: white;
+    box-shadow: 0 4px 18px rgba(0,0,0,.15);
+    cursor: pointer;
+    font-size: 15px;
+}
+
+.instalatuAplikazioa:hover {
+    transform: translateY(-2px);
+}
