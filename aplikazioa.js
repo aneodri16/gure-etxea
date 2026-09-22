@@ -695,63 +695,80 @@ kargatuSpotifyZerrendak();
 
 function erakutsiMusika() {
     const edukia = document.getElementById("edukia");
-
-    let zerrendaHtml = "";
-
-    if (spotifyZerrendak.length === 0) {
-        zerrendaHtml = `<p>Oraindik ez dago Spotify erreprodukzio-zerrendarik.</p>`;
-    } else {
-        zerrendaHtml = spotifyZerrendak.map((zerrenda, indizea) => `
-            <div class="spotifyZerrenda" onclick="irekiSpotifyZerrenda(${indizea})">
-                <div class="spotifyZerrendaIkonoa">🎵</div>
-                <div class="spotifyZerrendaInfoa">
-                    <h3>${ihesTestua(zerrenda.izena)}</h3>
-                    <p>Spotify-n ireki →</p>
+    const zerrendaHtml = spotifyZerrendak.length === 0
+        ? "<p>Oraindik ez dago Spotify erreprodukzio-zerrendarik.</p>"
+        : spotifyZerrendak.map((zerrenda, indizea) => `
+            <div class="spotifyZerrenda">
+                <button class="spotifyZerrendaIreki" onclick="irekiSpotifyZerrenda(${indizea})">
+                    <div class="spotifyZerrendaIkonoa">🎵</div>
+                    <div class="spotifyZerrendaInfoa">
+                        <h3>${ihesTestua(zerrenda.izena)}</h3>
+                        <p>Spotify-n ireki →</p>
+                    </div>
+                </button>
+                <div class="spotifyZerrendaBotoiak">
+                    <button title="Aldatu" onclick="editatuSpotifyZerrenda(${indizea})">✏️</button>
+                    <button title="Ezabatu" onclick="ezabatuSpotifyZerrenda(${indizea})">🗑️</button>
                 </div>
             </div>
         `).join("");
-    }
 
     edukia.innerHTML = `
         <h2>🎵 Erreprodukzio-zerrendak</h2>
-        <p>Klikatu zerrenda batean eta Spotify-n irekiko da.</p>
-
-        <div class="spotifyZerrendenZerrenda">
-            ${zerrendaHtml}
-        </div>
-
+        <p>Gorde etxeko Spotify playlist gogokoenak eta ireki zuzenean Spotify-n.</p>
+        <div class="spotifyZerrendenZerrenda">${zerrendaHtml}</div>
         <hr>
-
         <h3>➕ Spotify zerrenda gehitu</h3>
         <input type="text" id="spotifyIzena" placeholder="Adib. Afalosteko musika">
-        <input type="url" id="spotifyEsteka" placeholder="Spotify playlistaren esteka">
+        <input type="url" id="spotifyEsteka" placeholder="https://open.spotify.com/playlist/...">
         <button onclick="gehituSpotifyZerrenda()">💾 Gehitu</button>
     `;
 }
 
 function gehituSpotifyZerrenda() {
-    const izenaInput = document.getElementById("spotifyIzena");
-    const estekaInput = document.getElementById("spotifyEsteka");
-
-    const izena = izenaInput.value.trim();
-    const esteka = estekaInput.value.trim();
-
-    if (!izena) {
-        alert("Idatzi erreprodukzio-zerrendaren izena.");
-        return;
+    const izena = document.getElementById("spotifyIzena")?.value.trim() || "";
+    const esteka = document.getElementById("spotifyEsteka")?.value.trim() || "";
+    if (!izena) { alert("Idatzi erreprodukzio-zerrendaren izena."); return; }
+    if (!/^https:\/\/open\.spotify\.com\/playlist\/[A-Za-z0-9]+/.test(esteka)) {
+        alert("Spotify playlist baten esteka zuzena behar da."); return;
     }
+    spotifyZerrendak.push({ id: Date.now(), izena, esteka });
+    gordeSpotifyZerrendak();
+    erakutsiMusika();
+}
 
-    if (!esteka.startsWith("https://open.spotify.com/playlist/")) {
-        alert("Spotify playlist baten esteka behar da.");
-        return;
+function editatuSpotifyZerrenda(indizea) {
+    const z = spotifyZerrendak[indizea];
+    if (!z) return;
+    const edukia = document.getElementById("edukia");
+    edukia.innerHTML = `
+        <h2>✏️ Spotify zerrenda aldatu</h2>
+        <input type="text" id="spotifyIzenaEditatu" value="${ihesTestua(z.izena)}" placeholder="Zerrendaren izena">
+        <input type="url" id="spotifyEstekaEditatu" value="${ihesTestua(z.esteka)}" placeholder="Spotify playlistaren esteka">
+        <br><br>
+        <button onclick="gordeSpotifyZerrendaAldaketa(${indizea})">💾 Gorde</button>
+        <button onclick="erakutsiMusika()">↩️ Itzuli</button>
+    `;
+}
+
+function gordeSpotifyZerrendaAldaketa(indizea) {
+    const z = spotifyZerrendak[indizea];
+    if (!z) return;
+    const izena = document.getElementById("spotifyIzenaEditatu")?.value.trim() || "";
+    const esteka = document.getElementById("spotifyEstekaEditatu")?.value.trim() || "";
+    if (!izena) { alert("Idatzi erreprodukzio-zerrendaren izena."); return; }
+    if (!/^https:\/\/open\.spotify\.com\/playlist\/[A-Za-z0-9]+/.test(esteka)) {
+        alert("Spotify playlist baten esteka zuzena behar da."); return;
     }
+    spotifyZerrendak[indizea] = { ...z, izena, esteka };
+    gordeSpotifyZerrendak();
+    erakutsiMusika();
+}
 
-    spotifyZerrendak.push({
-        id: Date.now(),
-        izena,
-        esteka
-    });
-
+function ezabatuSpotifyZerrenda(indizea) {
+    if (!spotifyZerrendak[indizea]) return;
+    if (!confirm("Spotify zerrenda hau ezabatu nahi duzu?")) return;
+    spotifyZerrendak.splice(indizea, 1);
     gordeSpotifyZerrendak();
     erakutsiMusika();
 }
@@ -759,9 +776,6 @@ function gehituSpotifyZerrenda() {
 function irekiSpotifyZerrenda(indizea) {
     const zerrenda = spotifyZerrendak[indizea];
     if (!zerrenda) return;
-
-    // Spotify-ren Universal Link-a erabiltzen dugu:
-    // mugikorrean/mahaigainean Spotify aplikazioa badago, sistemak hara bideratu ohi du.
     window.location.href = zerrenda.esteka;
 }
 
