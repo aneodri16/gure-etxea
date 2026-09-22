@@ -764,3 +764,5 @@ window.addEventListener("appinstalled", () => {
     if (botoia) botoia.remove();
 });
 
+
+// TEST WRITE: Etxeko oharrak prestatzen
