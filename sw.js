@@ -1,4 +1,4 @@
-const CACHEA = "gure-etxea-v2";
+const CACHEA = "gure-etxea-v3";
 const FITXATEGIAK = [
   "./",
   "./index.html",
