@@ -78,21 +78,31 @@ let calendarEkitaldiak = [];
 function erakutsiDataGarrantzitsuak() {
     const edukia = document.getElementById("edukia");
     edukia.innerHTML = `
-        <h2>❤️ Google Calendar</h2>
-        <p>Hemen etxeko Google Calendar-eko ekitaldiak ikusiko ditugu.</p>
-        <p><strong>Irakurtzeko soilik:</strong> aplikazio honek ez du ekitaldirik sortu, aldatu edo ezabatuko.</p>
+        <div class="calendarGoiburuaAtala">
+            <div>
+                <h2>❤️ Google Calendar</h2>
+                <p>Gure etxeko egutegiko ekitaldiak hemen ikus ditzakezu.</p>
+            </div>
+            <span class="calendarIrakurtzekoSoilik">👁️ Irakurtzeko soilik</span>
+        </div>
+
         <div class="calendarTresnak">
-            <button onclick="googleCalendarSaioaHasi()">🔐 Google Calendar konektatu</button>
+            <button onclick="googleCalendarSaioaHasi()">🔐 Konektatu</button>
             <button onclick="googleCalendarEguneratu()">🔄 Eguneratu</button>
             <button onclick="calendarAurrekoa()">⬅️</button>
             <strong id="calendarHilabeteIzenburua"></strong>
             <button onclick="calendarHurrengoa()">➡️</button>
             <button onclick="calendarGaur()">📍 Gaur</button>
+            <button onclick="googleCalendarDeskonektatu()">🔒 Deskonektatu</button>
         </div>
+
         <div id="googleCalendarMezua" class="calendarMezua"></div>
+        <div id="googleCalendarLaburpena" class="calendarLaburpena"></div>
         <div id="googleCalendarTaula"></div>
+        <div id="googleCalendarAgenda" class="calendarAgenda"></div>
     `;
     prestatuGoogleCalendar();
+    marraztuGoogleCalendar();
 }
 
 function prestatuGoogleCalendar() {
@@ -121,7 +131,7 @@ function prestatuGoogleCalendar() {
 function prestatuGoogleTokena() {
     if (googleGisPrest) return;
     if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.includes("SARTU_")) {
-        erakutsiGoogleCalendarMezua("Google Calendar konektatzeko, ireki <strong>google-konfigurazioa.js</strong> eta sartu Google Cloud-eko Client ID eta API Key-a.");
+        erakutsiGoogleCalendarMezua("⚙️ Falta dira Google Cloud-eko Client ID eta API Key-a google-konfigurazioa.js fitxategian.");
         marraztuCalendarHutsa();
         return;
     }
@@ -141,26 +151,41 @@ function googleCalendarSaioaHasi() {
     }
     googleTokenClient.callback = async (erantzuna) => {
         if (erantzuna.error) {
-            erakutsiGoogleCalendarMezua("Ezin izan da Google Calendar konektatu.");
+            erakutsiGoogleCalendarMezua("❌ Ezin izan da Google Calendar konektatu.");
             return;
         }
-        erakutsiGoogleCalendarMezua("Google Calendar konektatuta. Ekitaldiak kargatzen...");
+        erakutsiGoogleCalendarMezua("⏳ Google Calendar konektatzen...");
         await googleCalendarEguneratu();
     };
     googleTokenClient.requestAccessToken({ prompt: "consent" });
 }
 
+function googleCalendarDeskonektatu() {
+    if (typeof google !== "undefined" && gapi.client.getToken()) {
+        const tokena = gapi.client.getToken();
+        if (tokena && tokena.access_token) {
+            google.accounts.oauth2.revoke(tokena.access_token, () => {});
+        }
+        gapi.client.setToken(null);
+    }
+    calendarEkitaldiak = [];
+    erakutsiGoogleCalendarMezua("🔒 Google Calendar deskonektatuta.");
+    marraztuGoogleCalendar();
+}
+
 async function googleCalendarEguneratu() {
     if (!googleGapiPrest) {
-        erakutsiGoogleCalendarMezua("Lehenengo konektatu Google Calendar.");
+        erakutsiGoogleCalendarMezua("⏳ Google Calendar prestatzen...");
+        prestatuGoogleCalendar();
         return;
     }
     const tokena = gapi.client.getToken();
     if (!tokena || !tokena.access_token) {
-        erakutsiGoogleCalendarMezua("Lehenengo sakatu 'Google Calendar konektatu'.");
+        erakutsiGoogleCalendarMezua("🔐 Lehenengo sakatu 'Konektatu'.");
         return;
     }
 
+    erakutsiGoogleCalendarMezua("⏳ Ekitaldiak kargatzen...");
     const lehenEguna = new Date(calendarHilabetea.getFullYear(), calendarHilabetea.getMonth(), 1, 0, 0, 0);
     const azkenEguna = new Date(calendarHilabetea.getFullYear(), calendarHilabetea.getMonth() + 1, 1, 0, 0, 0);
 
@@ -175,11 +200,11 @@ async function googleCalendarEguneratu() {
             maxResults: 2500
         });
         calendarEkitaldiak = erantzuna.result.items || [];
-        erakutsiGoogleCalendarMezua(`${calendarEkitaldiak.length} ekitaldi kargatu dira.`);
+        erakutsiGoogleCalendarMezua(`✅ ${calendarEkitaldiak.length} ekitaldi kargatu dira.`);
         marraztuGoogleCalendar();
     } catch (errorea) {
         console.error(errorea);
-        erakutsiGoogleCalendarMezua("Ezin izan dira Calendar-eko ekitaldiak kargatu. Egiaztatu baimenak eta konfigurazioa.");
+        erakutsiGoogleCalendarMezua("❌ Ezin izan dira Calendar-eko ekitaldiak kargatu. Egiaztatu baimenak eta konfigurazioa.");
     }
 }
 
@@ -216,10 +241,10 @@ function marraztuGoogleCalendar() {
     const izenburua = document.getElementById("calendarHilabeteIzenburua");
     if (!taula || !izenburua) return;
 
-    const hilabeteIzenak = ["Urtarrila", "Otsaila", "Martxoa", "Apirila", "Maiatza", "Ekaina", "Uztaila", "Abuztua", "Iraila", "Urria", "Azaroa", "Abendua"];
+    const hilabeteIzenak = ["Urtarrila","Otsaila","Martxoa","Apirila","Maiatza","Ekaina","Uztaila","Abuztua","Iraila","Urria","Azaroa","Abendua"];
     izenburua.textContent = `${hilabeteIzenak[calendarHilabetea.getMonth()]} ${calendarHilabetea.getFullYear()}`;
 
-    const egunIzenak = ["Astelehena", "Asteartea", "Asteazkena", "Osteguna", "Ostirala", "Larunbata", "Igandea"];
+    const egunIzenak = ["Astelehena","Asteartea","Asteazkena","Osteguna","Ostirala","Larunbata","Igandea"];
     let html = `<div class="calendarGrid">`;
     egunIzenak.forEach(e => html += `<div class="calendarGoiburua">${e}</div>`);
 
@@ -229,6 +254,8 @@ function marraztuGoogleCalendar() {
     const egunKopurua = new Date(calendarHilabetea.getFullYear(), calendarHilabetea.getMonth() + 1, 0).getDate();
     const aurrekoHilabetekoEgunak = new Date(calendarHilabetea.getFullYear(), calendarHilabetea.getMonth(), 0).getDate();
     const gelaxkaKopurua = Math.ceil((hasierakoPos + egunKopurua) / 7) * 7;
+    const dataGakoaLokala = data => `${data.getFullYear()}-${String(data.getMonth()+1).padStart(2,"0")}-${String(data.getDate()).padStart(2,"0")}`;
+    const gaurGakoa = dataGakoaLokala(new Date());
 
     for (let pos = 0; pos < gelaxkaKopurua; pos++) {
         const egunZenbakia = pos - hasierakoPos + 1;
@@ -244,11 +271,7 @@ function marraztuGoogleCalendar() {
             dataObj = new Date(calendarHilabetea.getFullYear(), calendarHilabetea.getMonth(), egunZenbakia);
         }
 
-        // Data lokala erabiltzen dugu. toISOString() UTC-ra bihurtzen denez,
-        // ordu-zona batzuetan gaurko eguna biharko bezala ager daiteke.
-        const dataGakoaLokala = data => `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}-${String(data.getDate()).padStart(2, "0")}`;
         const gakoa = dataGakoaLokala(dataObj);
-        const gaurGakoa = dataGakoaLokala(new Date());
         const klaseak = ["calendarEguna"];
         if (besteHilabete) klaseak.push("besteHilabete");
         if (gakoa === gaurGakoa) klaseak.push("gaur");
@@ -256,13 +279,44 @@ function marraztuGoogleCalendar() {
         const egunekoak = calendarEkitaldiak.filter(e => calendarEkitaldiarenData(e) === gakoa);
         html += `<div class="${klaseak.join(" ")}"><div class="calendarEgunZenbakia">${dataObj.getDate()}</div>`;
         egunekoak.forEach(e => {
-            const ordua = e.start?.dateTime ? new Date(e.start.dateTime).toLocaleTimeString("eu-ES", {hour: "2-digit", minute: "2-digit"}) : "Egun osoa";
+            const ordua = e.start?.dateTime ? new Date(e.start.dateTime).toLocaleTimeString("eu-ES",{hour:"2-digit",minute:"2-digit"}) : "Egun osoa";
             html += `<div class="calendarEkitaldia" title="${ihesHtml(e.summary || "Ekitaldia")}"><strong>${ihesHtml(e.summary || "(Izenik gabe)")}</strong><br><small>${ordua}</small></div>`;
         });
         html += `</div>`;
     }
-    html += `</div>`;
+    html += "</div>";
     taula.innerHTML = html;
+
+    const laburpena = document.getElementById("googleCalendarLaburpena");
+    if (laburpena) {
+        const hilabetekoak = calendarEkitaldiak.filter(e => {
+            const d = calendarEkitaldiarenData(e);
+            return d.startsWith(`${calendarHilabetea.getFullYear()}-${String(calendarHilabetea.getMonth()+1).padStart(2,"0")}`);
+        });
+        laburpena.innerHTML = hilabetekoak.length ? `📌 Hilabete honetan <strong>${hilabetekoak.length}</strong> ekitaldi${hilabetekoak.length === 1 ? "a" : ""}.` : "📭 Hilabete honetan ez dago ekitaldirik.";
+    }
+
+    marraztuCalendarAgenda();
+}
+
+function marraztuCalendarAgenda() {
+    const agenda = document.getElementById("googleCalendarAgenda");
+    if (!agenda) return;
+    const hilabetekoak = [...calendarEkitaldiak].sort((a,b) => calendarEkitaldiarenData(a).localeCompare(calendarEkitaldiarenData(b)));
+    if (!hilabetekoak.length) {
+        agenda.innerHTML = "";
+        return;
+    }
+    agenda.innerHTML = `
+        <h3>📋 Hilabeteko agenda</h3>
+        ${hilabetekoak.map(e => {
+            const data = calendarEkitaldiarenData(e);
+            const izena = ihesHtml(e.summary || "(Izenik gabe)");
+            const dataPolita = data ? new Date(data + "T12:00:00").toLocaleDateString("eu-ES",{weekday:"short",day:"numeric",month:"long"}) : "";
+            const ordua = e.start?.dateTime ? new Date(e.start.dateTime).toLocaleTimeString("eu-ES",{hour:"2-digit",minute:"2-digit"}) : "Egun osoa";
+            return `<div class="calendarAgendaEkitaldia"><div><strong>${izena}</strong><small>${dataPolita} · ${ordua}</small></div></div>`;
+        }).join("")}
+    `;
 }
 
 function calendarEkitaldiarenData(ekitaldia) {
