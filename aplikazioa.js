@@ -319,7 +319,7 @@ function marraztuCalendarAgenda() {
             const izena = ihesHtml(e.summary || "(Izenik gabe)");
             const dataPolita = data ? new Date(data + "T12:00:00").toLocaleDateString("eu-ES",{weekday:"short",day:"numeric",month:"long"}) : "";
             const ordua = e.start?.dateTime ? new Date(e.start.dateTime).toLocaleTimeString("eu-ES",{hour:"2-digit",minute:"2-digit"}) : "Egun osoa";
-            return `<button class="calendarAgendaEkitaldia" onclick="erakutsiCalendarEkitaldiXehetasunak('${ihesHtmlAttribute(e.id || "")}')"><div><strong>${izena}</strong><small>${dataPolita} · ${ordua}</small></div></button>`;
+            return `<button class="calendarAgendaEkitaldia" style="${calendarEkitaldiKolorea(e)}" onclick="erakutsiCalendarEkitaldiXehetasunak('${ihesHtmlAttribute(e.id || "")}')"><div><strong>${izena}</strong><small>${dataPolita} · ${ordua}</small></div></button>`;
         }).join("")}
     `;
 }
