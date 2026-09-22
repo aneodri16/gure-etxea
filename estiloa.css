@@ -231,3 +231,6 @@ input, select { padding:9px; border:1px solid #ddd; border-radius:8px; max-width
 .oharKoloreak button{margin:0;padding:7px 9px;background:#f3f3f3;border:2px solid transparent}
 .oharKoloreak button.aukeratua{border-color:#555}
 .oharTxartela:has(.oharLaburpena){ }
+
+/* Etxeko oharren koloreak */
+.oharHoria{background:#fff8d8}.oharUrdina{background:#eaf4ff}.oharBerdea{background:#ecf8ec}.oharGorria{background:#fff0f0}.checkEginDa{opacity:.65}.checkItemTestua.checkEginDa{text-decoration:line-through}
