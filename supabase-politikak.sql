@@ -30,3 +30,29 @@ begin
     execute format('grant select, insert, update, delete on table public.%I to authenticated', taula, taula);
   end loop;
 end $$;
+
+
+-- Sinkronizazio sinplea: aplikazioaren egoera osoa JSON gisa gordetzen du.
+create table if not exists public.etxeko_datuak (
+  id text primary key,
+  datuak jsonb not null default '{}'::jsonb,
+  eguneratua_at timestamptz not null default now()
+);
+
+alter table public.etxeko_datuak enable row level security;
+
+drop policy if exists "authenticated_select_etxeko_datuak" on public.etxeko_datuak;
+drop policy if exists "authenticated_insert_etxeko_datuak" on public.etxeko_datuak;
+drop policy if exists "authenticated_update_etxeko_datuak" on public.etxeko_datuak;
+drop policy if exists "authenticated_delete_etxeko_datuak" on public.etxeko_datuak;
+
+create policy "authenticated_select_etxeko_datuak" on public.etxeko_datuak
+  for select to authenticated using (true);
+create policy "authenticated_insert_etxeko_datuak" on public.etxeko_datuak
+  for insert to authenticated with check (true);
+create policy "authenticated_update_etxeko_datuak" on public.etxeko_datuak
+  for update to authenticated using (true) with check (true);
+create policy "authenticated_delete_etxeko_datuak" on public.etxeko_datuak
+  for delete to authenticated using (true);
+
+grant select, insert, update, delete on table public.etxeko_datuak to authenticated;
