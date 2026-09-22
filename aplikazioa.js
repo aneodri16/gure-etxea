@@ -98,6 +98,7 @@ function erakutsiDataGarrantzitsuak() {
 
         <div id="googleCalendarMezua" class="calendarMezua"></div>
         <div id="googleCalendarLaburpena" class="calendarLaburpena"></div>
+        <div id="googleCalendarXehetasunak" class="calendarXehetasunak"></div>
         <div id="googleCalendarTaula"></div>
         <div id="googleCalendarAgenda" class="calendarAgenda"></div>
     `;
@@ -280,7 +281,7 @@ function marraztuGoogleCalendar() {
         html += `<div class="${klaseak.join(" ")}"><div class="calendarEgunZenbakia">${dataObj.getDate()}</div>`;
         egunekoak.forEach(e => {
             const ordua = e.start?.dateTime ? new Date(e.start.dateTime).toLocaleTimeString("eu-ES",{hour:"2-digit",minute:"2-digit"}) : "Egun osoa";
-            html += `<div class="calendarEkitaldia" title="${ihesHtml(e.summary || "Ekitaldia")}"><strong>${ihesHtml(e.summary || "(Izenik gabe)")}</strong><br><small>${ordua}</small></div>`;
+            html += `<button class="calendarEkitaldia" title="${ihesHtml(e.summary || "Ekitaldia")}" onclick="erakutsiCalendarEkitaldiXehetasunak('${ihesHtmlAttribute(e.id || "")}')"><strong>${ihesHtml(e.summary || "(Izenik gabe)")}</strong><br><small>${ordua}</small></button>`;
         });
         html += `</div>`;
     }
@@ -314,9 +315,58 @@ function marraztuCalendarAgenda() {
             const izena = ihesHtml(e.summary || "(Izenik gabe)");
             const dataPolita = data ? new Date(data + "T12:00:00").toLocaleDateString("eu-ES",{weekday:"short",day:"numeric",month:"long"}) : "";
             const ordua = e.start?.dateTime ? new Date(e.start.dateTime).toLocaleTimeString("eu-ES",{hour:"2-digit",minute:"2-digit"}) : "Egun osoa";
-            return `<div class="calendarAgendaEkitaldia"><div><strong>${izena}</strong><small>${dataPolita} · ${ordua}</small></div></div>`;
+            return `<button class="calendarAgendaEkitaldia" onclick="erakutsiCalendarEkitaldiXehetasunak('${ihesHtmlAttribute(e.id || "")}')"><div><strong>${izena}</strong><small>${dataPolita} · ${ordua}</small></div></button>`;
         }).join("")}
     `;
+}
+
+function ihesHtmlAttribute(testua) {
+    return String(testua).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function erakutsiCalendarEkitaldiXehetasunak(id) {
+    const ekitaldia = calendarEkitaldiak.find(e => e.id === id);
+    if (!ekitaldia) return;
+
+    const izena = ihesHtml(ekitaldia.summary || "(Izenik gabe)");
+    const kokapena = ekitaldia.location ? ihesHtml(ekitaldia.location) : "Ez da zehaztu";
+    const deskribapena = ekitaldia.description ? ihesHtml(ekitaldia.description).replace(/\n/g, "<br>") : "Deskribapenik ez";
+    const hasieraData = calendarDataOrdua(ekitaldia.start);
+    const amaieraData = calendarDataOrdua(ekitaldia.end);
+    const esteka = ekitaldia.htmlLink ? `<a href="${ihesHtmlAttribute(ekitaldia.htmlLink)}" target="_blank" rel="noopener">Google Calendar-en ireki ↗</a>` : "";
+
+    const xehetasunak = document.getElementById("googleCalendarXehetasunak");
+    if (!xehetasunak) return;
+
+    xehetasunak.innerHTML = `
+        <div class="calendarXehetasunTxartela">
+            <div class="calendarXehetasunGoiburua">
+                <h3>📌 ${izena}</h3>
+                <button onclick="itxiCalendarXehetasunak()" aria-label="Itxi">✕</button>
+            </div>
+            <div class="calendarXehetasunEremua"><strong>🕐 Noiz:</strong><span>${hasieraData}${amaieraData ? " — " + amaieraData : ""}</span></div>
+            <div class="calendarXehetasunEremua"><strong>📍 Non:</strong><span>${kokapena}</span></div>
+            <div class="calendarXehetasunEremua"><strong>📝 Deskribapena:</strong><span>${deskribapena}</span></div>
+            ${esteka ? `<div class="calendarXehetasunEsteka">${esteka}</div>` : ""}
+        </div>
+    `;
+    xehetasunak.scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+
+function calendarDataOrdua(datuak) {
+    if (!datuak) return "";
+    if (datuak.date) {
+        return new Date(datuak.date + "T12:00:00").toLocaleDateString("eu-ES", {weekday:"long", day:"numeric", month:"long", year:"numeric"});
+    }
+    if (datuak.dateTime) {
+        return new Date(datuak.dateTime).toLocaleString("eu-ES", {weekday:"long", day:"numeric", month:"long", year:"numeric", hour:"2-digit", minute:"2-digit"});
+    }
+    return "";
+}
+
+function itxiCalendarXehetasunak() {
+    const xehetasunak = document.getElementById("googleCalendarXehetasunak");
+    if (xehetasunak) xehetasunak.innerHTML = "";
 }
 
 function calendarEkitaldiarenData(ekitaldia) {
