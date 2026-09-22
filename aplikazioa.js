@@ -19,6 +19,8 @@ const supabaseClient = window.supabase.createClient(
     SUPABASE_PUBLISHABLE_KEY
 );
 let erabiltzailea = null;
+// Autentifikazioa behin-behinean desgaituta: aplikazioa zuzenean irekitzen da.
+const AUTENTIFIKAZIOA_AKTIBATUTA = false;
 
 // ========================================
 // SUPABASE DATUEN SINKRONIZAZIOA
@@ -257,6 +259,11 @@ async function saioaItxi() {
 }
 
 async function egiaztatuSaioa() {
+    if (!AUTENTIFIKAZIOA_AKTIBATUTA) {
+        erakutsiAplikazioa();
+        return;
+    }
+
     const { data, error } = await supabaseClient.auth.getUser();
     if (error || !data.user) {
         erabiltzailea = null;
@@ -269,16 +276,18 @@ async function egiaztatuSaioa() {
     hasiSupabaseEguneratzeAutomatikoa();
 }
 
-supabaseClient.auth.onAuthStateChange((_event, session) => {
-    erabiltzailea = session?.user || null;
-    if (erabiltzailea) {
-        erakutsiAplikazioa();
-        hasiSupabaseEguneratzeAutomatikoa();
-    } else {
-        erakutsiSaioPantaila();
-        clearInterval(supabaseEguneratzeTimer);
-    }
-});
+if (AUTENTIFIKAZIOA_AKTIBATUTA) {
+    supabaseClient.auth.onAuthStateChange((_event, session) => {
+        erabiltzailea = session?.user || null;
+        if (erabiltzailea) {
+            erakutsiAplikazioa();
+            hasiSupabaseEguneratzeAutomatikoa();
+        } else {
+            erakutsiSaioPantaila();
+            clearInterval(supabaseEguneratzeTimer);
+        }
+    });
+}
 
 
 
