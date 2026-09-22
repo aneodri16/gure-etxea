@@ -534,6 +534,22 @@ function gordePlangintza(){
     gordeDatuak();
     alert("Aste-plangintza gordeta! 📅✅");
 }
+function bihurtuNeurria(kantitatea, unitatea) {
+    const u = String(unitatea || "").toLowerCase().trim();
+    const n = Number(kantitatea);
+    if (!Number.isFinite(n)) return null;
+    if (u === "g") return { kantitatea: n / 1000, unitatea: "kg" };
+    if (u === "kg") return { kantitatea: n, unitatea: "kg" };
+    if (u === "ml") return { kantitatea: n / 1000, unitatea: "l" };
+    if (u === "l") return { kantitatea: n, unitatea: "l" };
+    return { kantitatea: n, unitatea: u };
+}
+
+function txukunduKantitatea(n) {
+    if (!Number.isFinite(n)) return "";
+    return Number(n.toFixed(3)).toString();
+}
+
 function sortuErosketaZerrendaAstetik(){
     gordePlangintza();
     const batuak = {};
@@ -545,19 +561,29 @@ function sortuErosketaZerrendaAstetik(){
         if (!p) return;
 
         p.osagaiak.forEach(o => {
-            const k = o.osagaiaId;
+            const neurketa = (o.kantitatea !== null && o.kantitatea !== "" && o.kantitatea !== undefined)
+                ? bihurtuNeurria(o.kantitatea, o.unitatea)
+                : null;
+
+            const oinarrizkoUnitatea = neurketa?.unitatea || (o.unitatea || "");
+            const unitateGakoa = ["g", "kg"].includes(o.unitatea) ? "kg"
+                : ["ml", "l"].includes(o.unitatea) ? "l"
+                : oinarrizkoUnitatea;
+            const k = `${o.osagaiaId}__${unitateGakoa}`;
+
             if (!batuak[k]) {
                 batuak[k] = {
                     id: k,
+                    osagaiaId: o.osagaiaId,
                     izena: o.izena,
                     kantitatea: 0,
-                    unitatea: o.unitatea || "",
+                    unitatea: oinarrizkoUnitatea,
                     kantitateaDago: false
                 };
             }
 
-            if (o.kantitatea !== null && o.kantitatea !== "" && batuak[k].unitatea === (o.unitatea || "")) {
-                batuak[k].kantitatea += Number(o.kantitatea);
+            if (neurketa) {
+                batuak[k].kantitatea += neurketa.kantitatea;
                 batuak[k].kantitateaDago = true;
             }
         });
@@ -566,6 +592,7 @@ function sortuErosketaZerrendaAstetik(){
     const aurrekoMarkatuak = new Map(erosketaZerrenda.map(o => [String(o.id), !!o.eginda]));
     erosketaZerrenda = Object.values(batuak).map(o => ({
         ...o,
+        kantitatea: txukunduKantitatea(o.kantitatea),
         eginda: aurrekoMarkatuak.get(String(o.id)) || false
     }));
 
