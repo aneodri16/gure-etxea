@@ -220,3 +220,14 @@ input, select { padding:9px; border:1px solid #ddd; border-radius:8px; max-width
 
 /* ETXEKO OHARRAK */
 .oharBotoiak{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}.oharrenZerrenda{display:grid;gap:12px;margin-top:20px}.oharTxartela{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;background:#fafafa;border-radius:15px;cursor:pointer}.oharTxartela h3{margin:0 0 5px}.oharLaburpena{margin:0;color:#777}textarea#oharTestua{width:100%;min-height:220px;margin:12px 0;padding:12px;border:1px solid #ddd;border-radius:10px;resize:vertical;font:inherit}.checklistElementuak{display:grid;gap:8px;margin:16px 0}.checklistElementua{display:flex;align-items:center;gap:8px}.checklistElementua .checkItemTestua{flex:1}
+
+/* Etxeko oharrak - hobekuntzak */
+.oharTxartela{position:relative}
+.oharFinkatua{border:2px solid #777}
+.oharEdukiNagusia{flex:1;min-width:0}
+.oharTxartelBotoiak{display:flex;align-items:center;gap:4px}
+.oharTxartelBotoiak button{margin:0}
+.oharKoloreak{display:flex;gap:6px;margin:12px 0}
+.oharKoloreak button{margin:0;padding:7px 9px;background:#f3f3f3;border:2px solid transparent}
+.oharKoloreak button.aukeratua{border-color:#555}
+.oharTxartela:has(.oharLaburpena){ }
