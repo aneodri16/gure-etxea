@@ -132,29 +132,34 @@ function erakutsiSaioPantaila(mezua = "") {
     edukia.innerHTML = `
         <div class="saioPantaila">
             <div class="saioTxartela">
-                <div class="saioIkonoa">🔐</div>
+                <div class="saioIkonoa">🏠</div>
                 <h2>Gure etxea</h2>
-                <p class="saioAzalpena">Hasi saioa zure etxeko datuak ikusteko.</p>
+                <p class="saioAzalpena">Sartu zure Google kontuarekin.</p>
 
-                <form id="saioInprimakia" onsubmit="saioaHasi(event)">
-                    <label for="saioEmaila">Emaila</label>
-                    <input type="email" id="saioEmaila" autocomplete="email" required placeholder="zure@emaila.eus">
-
-                    <label for="saioPasahitza">Pasahitza</label>
-                    <input type="password" id="saioPasahitza" autocomplete="current-password" required placeholder="Pasahitza">
-
-                    <button type="submit" class="saioBotoiNagusia">🔓 Saioa hasi</button>
-                </form>
+                <button type="button" class="saioBotoiNagusia" onclick="googlezSaioaHasi()">
+                    🔵 Google-rekin sartu
+                </button>
 
                 <div id="saioMezua" class="saioMezua">${ihesTestua(mezua)}</div>
-
-                <div class="saioBereizlea"><span>edo</span></div>
-
-                <button type="button" class="saioBotoiBiguna" onclick="kontuaSortu()">➕ Kontua sortu</button>
-                <button type="button" class="saioBotoiTestua" onclick="pasahitzaBerreskuratu()">🔑 Pasahitza ahaztu dut</button>
             </div>
         </div>
     `;
+}
+
+async function googlezSaioaHasi() {
+    const mezua = document.getElementById("saioMezua");
+    if (mezua) mezua.textContent = "⏳ Google irekitzen...";
+
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+            redirectTo: window.location.origin + window.location.pathname
+        }
+    });
+
+    if (error && mezua) {
+        mezua.textContent = "❌ Ezin izan da Google bidez saioa hasi: " + error.message;
+    }
 }
 
 function erakutsiAplikazioa() {
