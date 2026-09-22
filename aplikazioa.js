@@ -74,6 +74,7 @@ let googleGapiPrest = false;
 let googleGisPrest = false;
 let calendarHilabetea = new Date();
 let calendarEkitaldiak = [];
+let calendarKoloreak = {};
 
 function erakutsiDataGarrantzitsuak() {
     const edukia = document.getElementById("edukia");
@@ -118,6 +119,8 @@ function prestatuGoogleCalendar() {
                     apiKey: GOOGLE_API_KEY,
                     discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"]
                 });
+                const koloreErantzuna = await gapi.client.calendar.colors.get({});
+                calendarKoloreak = koloreErantzuna.result?.event || {};
                 googleGapiPrest = true;
                 prestatuGoogleTokena();
             } catch (errorea) {
@@ -281,7 +284,8 @@ function marraztuGoogleCalendar() {
         html += `<div class="${klaseak.join(" ")}"><div class="calendarEgunZenbakia">${dataObj.getDate()}</div>`;
         egunekoak.forEach(e => {
             const ordua = e.start?.dateTime ? new Date(e.start.dateTime).toLocaleTimeString("eu-ES",{hour:"2-digit",minute:"2-digit"}) : "Egun osoa";
-            html += `<button class="calendarEkitaldia" title="${ihesHtml(e.summary || "Ekitaldia")}" onclick="erakutsiCalendarEkitaldiXehetasunak('${ihesHtmlAttribute(e.id || "")}')"><strong>${ihesHtml(e.summary || "(Izenik gabe)")}</strong><br><small>${ordua}</small></button>`;
+            const kolorea = calendarEkitaldiKolorea(e);
+            html += `<button class="calendarEkitaldia" style="${kolorea}" title="${ihesHtml(e.summary || "Ekitaldia")}" onclick="erakutsiCalendarEkitaldiXehetasunak('${ihesHtmlAttribute(e.id || "")}')"><strong>${ihesHtml(e.summary || "(Izenik gabe)")}</strong><br><small>${ordua}</small></button>`;
         });
         html += `</div>`;
     }
@@ -318,6 +322,14 @@ function marraztuCalendarAgenda() {
             return `<button class="calendarAgendaEkitaldia" onclick="erakutsiCalendarEkitaldiXehetasunak('${ihesHtmlAttribute(e.id || "")}')"><div><strong>${izena}</strong><small>${dataPolita} · ${ordua}</small></div></button>`;
         }).join("")}
     `;
+}
+
+function calendarEkitaldiKolorea(ekitaldia) {
+    const kolorea = ekitaldia?.colorId ? calendarKoloreak[ekitaldia.colorId] : null;
+    if (kolorea?.background && kolorea?.foreground) {
+        return `background:${kolorea.background};color:${kolorea.foreground};`;
+    }
+    return "";
 }
 
 function ihesHtmlAttribute(testua) {
