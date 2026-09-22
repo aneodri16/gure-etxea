@@ -88,6 +88,26 @@ async function sinkronizatuSupabaseDatuak() {
     }
 }
 
+
+
+// Gailu desberdinen arteko eguneratzea: orria berriro aktibatzean eta 30 segundoro.
+let supabaseEguneratzeTimer = null;
+
+async function eguneratuSupabaseDatuak() {
+    if (!erabiltzailea || supabaseSinkronizatzen) return;
+    supabaseSinkronizazioPrest = false;
+    await sinkronizatuSupabaseDatuak();
+}
+
+function hasiSupabaseEguneratzeAutomatikoa() {
+    clearInterval(supabaseEguneratzeTimer);
+    supabaseEguneratzeTimer = setInterval(() => {
+        eguneratuSupabaseDatuak();
+    }, 30000);
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") eguneratuSupabaseDatuak();
+    });
+}
 function programatuSupabaseSinkronizazioa() {
     if (!erabiltzailea || !supabaseSinkronizazioPrest) return;
     clearTimeout(supabaseSinkronizazioTimer);
@@ -241,12 +261,18 @@ async function egiaztatuSaioa() {
     erabiltzailea = data.user;
     erakutsiAplikazioa();
     await sinkronizatuSupabaseDatuak();
+    hasiSupabaseEguneratzeAutomatikoa();
 }
 
 supabaseClient.auth.onAuthStateChange((_event, session) => {
     erabiltzailea = session?.user || null;
-    if (erabiltzailea) erakutsiAplikazioa();
-    else erakutsiSaioPantaila();
+    if (erabiltzailea) {
+        erakutsiAplikazioa();
+        hasiSupabaseEguneratzeAutomatikoa();
+    } else {
+        erakutsiSaioPantaila();
+        clearInterval(supabaseEguneratzeTimer);
+    }
 });
 
 
