@@ -20,6 +20,89 @@ const supabaseClient = window.supabase.createClient(
 );
 let erabiltzailea = null;
 
+// ========================================
+// SUPABASE DATUEN SINKRONIZAZIOA
+// ========================================
+const SUPABASE_DATUEN_ID = "etxea";
+let supabaseSinkronizazioTimer = null;
+let supabaseSinkronizatzen = false;
+let supabaseSinkronizazioPrest = false;
+
+function lortuCloudDatuak() {
+    return {
+        platerak: platerak.map(p => ({ ...p, irudia: null, pdf: null })),
+        osagaienKatalogoa,
+        astePlangintza,
+        erosketaZerrenda,
+        dataGarrantzitsuak,
+        etxekoOharrak,
+        spotifyZerrendak
+    };
+}
+
+function gordeCloudDatuakLokalean(datuak) {
+    platerak = Array.isArray(datuak?.platerak) ? datuak.platerak : [];
+    platerak.forEach(p => { if (typeof p.denbora !== "string") p.denbora = ""; });
+    osagaienKatalogoa = Array.isArray(datuak?.osagaienKatalogoa) ? datuak.osagaienKatalogoa : [];
+    astePlangintza = datuak?.astePlangintza || {};
+    erosketaZerrenda = Array.isArray(datuak?.erosketaZerrenda) ? datuak.erosketaZerrenda : [];
+    dataGarrantzitsuak = Array.isArray(datuak?.dataGarrantzitsuak) ? datuak.dataGarrantzitsuak : [];
+    etxekoOharrak = Array.isArray(datuak?.etxekoOharrak) ? datuak.etxekoOharrak : [];
+    spotifyZerrendak = Array.isArray(datuak?.spotifyZerrendak) ? datuak.spotifyZerrendak : [];
+    localStorage.setItem(SPOTIFY_GAKOA, JSON.stringify(spotifyZerrendak));
+}
+
+async function sinkronizatuSupabaseDatuak() {
+    if (!erabiltzailea || supabaseSinkronizatzen) return;
+    supabaseSinkronizatzen = true;
+    try {
+        const { data, error } = await supabaseClient
+            .from("etxeko_datuak")
+            .select("id,datuak")
+            .eq("id", SUPABASE_DATUEN_ID)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        const lokalak = lortuCloudDatuak();
+        const cloudak = data?.datuak;
+        const cloudakBaAlDitu = cloudak && Object.keys(cloudak).some(gakoa => {
+            const balioa = cloudak[gakoa];
+            return Array.isArray(balioa) ? balioa.length > 0 : balioa && Object.keys(balioa).length > 0;
+        });
+
+        if (cloudakBaAlDitu) {
+            gordeCloudDatuakLokalean(cloudak);
+            localStorage.setItem(DATUEN_GAKOA, JSON.stringify(lortuCloudDatuak()));
+        } else {
+            const { error: upsertErrorea } = await supabaseClient
+                .from("etxeko_datuak")
+                .upsert({ id: SUPABASE_DATUEN_ID, datuak: lokalak, eguneratua_at: new Date().toISOString() }, { onConflict: "id" });
+            if (upsertErrorea) throw upsertErrorea;
+        }
+        supabaseSinkronizazioPrest = true;
+    } catch (errorea) {
+        console.warn("Supabase sinkronizazioan errorea:", errorea);
+    } finally {
+        supabaseSinkronizatzen = false;
+    }
+}
+
+function programatuSupabaseSinkronizazioa() {
+    if (!erabiltzailea || !supabaseSinkronizazioPrest) return;
+    clearTimeout(supabaseSinkronizazioTimer);
+    supabaseSinkronizazioTimer = setTimeout(async () => {
+        try {
+            const { error } = await supabaseClient
+                .from("etxeko_datuak")
+                .upsert({ id: SUPABASE_DATUEN_ID, datuak: lortuCloudDatuak(), eguneratua_at: new Date().toISOString() }, { onConflict: "id" });
+            if (error) throw error;
+        } catch (errorea) {
+            console.warn("Ezin izan dira datuak Supabase-ra bidali:", errorea);
+        }
+    }, 700);
+}
+
 function erakutsiSaioPantaila(mezua = "") {
     const edukia = document.getElementById("edukia");
     const menua = document.querySelector(".menua");
@@ -88,6 +171,7 @@ async function saioaHasi(event) {
 
     erabiltzailea = data.user;
     erakutsiAplikazioa();
+    await sinkronizatuSupabaseDatuak();
 }
 
 async function kontuaSortu() {
@@ -115,6 +199,7 @@ async function kontuaSortu() {
     if (data.session) {
         erabiltzailea = data.user;
         erakutsiAplikazioa();
+        await sinkronizatuSupabaseDatuak();
     } else {
         if (mezua) mezua.textContent = "📧 Kontua sortuta. Begiratu emaila eta baieztatu kontua; ondoren hasi saioa.";
     }
@@ -155,6 +240,7 @@ async function egiaztatuSaioa() {
     }
     erabiltzailea = data.user;
     erakutsiAplikazioa();
+    await sinkronizatuSupabaseDatuak();
 }
 
 supabaseClient.auth.onAuthStateChange((_event, session) => {
@@ -167,14 +253,8 @@ supabaseClient.auth.onAuthStateChange((_event, session) => {
 
 function gordeDatuak() {
     try {
-        localStorage.setItem(DATUEN_GAKOA, JSON.stringify({
-            platerak: platerak.map(p => ({ ...p, irudia: null, pdf: null })),
-            osagaienKatalogoa,
-            astePlangintza,
-            erosketaZerrenda,
-            dataGarrantzitsuak,
-            etxekoOharrak
-        }));
+        localStorage.setItem(DATUEN_GAKOA, JSON.stringify(lortuCloudDatuak()));
+        programatuSupabaseSinkronizazioa();
     } catch (errorea) {
         console.warn("Ezin izan dira datuak gorde:", errorea);
     }
@@ -960,6 +1040,7 @@ function kargatuSpotifyZerrendak() {
 
 function gordeSpotifyZerrendak() {
     localStorage.setItem(SPOTIFY_GAKOA, JSON.stringify(spotifyZerrendak));
+    programatuSupabaseSinkronizazioa();
 }
 
 kargatuSpotifyZerrendak();
