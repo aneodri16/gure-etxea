@@ -7,6 +7,7 @@ let astePlangintza = {};
 let unekoAsteHasiera = null;
 let erosketaZerrenda = [];
 let dataGarrantzitsuak = [];
+let etxekoOharrak = [];
 
 const DATUEN_GAKOA = "gure_etxea_datuak_v1";
 
@@ -17,7 +18,8 @@ function gordeDatuak() {
             osagaienKatalogoa,
             astePlangintza,
             erosketaZerrenda,
-            dataGarrantzitsuak
+            dataGarrantzitsuak,
+            etxekoOharrak
         }));
     } catch (errorea) {
         console.warn("Ezin izan dira datuak gorde:", errorea);
@@ -35,6 +37,7 @@ function kargatuDatuak() {
         astePlangintza = datuak.astePlangintza || {};
         erosketaZerrenda = Array.isArray(datuak.erosketaZerrenda) ? datuak.erosketaZerrenda : [];
         dataGarrantzitsuak = Array.isArray(datuak.dataGarrantzitsuak) ? datuak.dataGarrantzitsuak : [];
+        etxekoOharrak = Array.isArray(datuak.etxekoOharrak) ? datuak.etxekoOharrak : [];
     } catch (errorea) {
         console.warn("Ezin izan dira datuak kargatu:", errorea);
     }
@@ -60,6 +63,7 @@ function erakutsiAtala(atala) {
     else if (atala === "erosketa") erakutsiErosketaZerrenda();
     else if (atala === "musika") edukia.innerHTML = `<h2>🎵 Erreprodukzio-zerrendak</h2><p>Aurrerago egingo dugu atal hau.</p>`;
     else if (atala === "datak") erakutsiDataGarrantzitsuak();
+    else if (atala === "oharrak") erakutsiEtxekoOharrak();
 }
 
 // ========================================
@@ -613,6 +617,28 @@ function garbituErosketaZerrenda(){
     erakutsiErosketaZerrenda();
 }
 
+
+function erakutsiEtxekoOharrak(){
+ const edukia=document.getElementById("edukia");
+ const zerrenda=etxekoOharrak.length?etxekoOharrak.map((o,i)=>`<div class="oharTxartela" onclick="irekiOharra(${i})"><div><h3>${o.mota==="checklist"?"☑️":"📝"} ${ihesTestua(o.izenburua||"Oharra")}</h3><p class="oharLaburpena">${o.mota==="checklist"?"Checklist — "+(o.elementuak||[]).filter(e=>e.eginda).length+"/"+(o.elementuak||[]).length:"Oharra"}</p></div><button onclick="event.stopPropagation();ezabatuOharra(${i})">🗑️</button></div>`).join(""):"<p>Oraindik ez dago oharrik.</p>";
+ edukia.innerHTML=`<h2>📝 Etxeko oharrak</h2><p>Oharrak edo checklistak sortu eta gorde ditzakezu.</p><div class="oharBotoiak"><button onclick="sortuOharra('oharra')">➕ Oharra</button><button onclick="sortuOharra('checklist')">☑️ Checklist berria</button></div><div class="oharrenZerrenda">${zerrenda}</div>`;
+}
+function sortuOharra(mota,indizea=null){
+ const o=indizea===null?(mota==="checklist"?{mota,izenburua:"",elementuak:[{testua:"",eginda:false}]}:{mota,izenburua:"",testua:""}):etxekoOharrak[indizea]; if(!o)return;
+ const edukia=document.getElementById("edukia");
+ if(mota==="checklist"){edukia.innerHTML=`<h2>☑️ Checklist</h2><input type="text" id="oharIzenburua" placeholder="Adib. Erosketak" value="${ihesTestua(o.izenburua||"")}"><div id="checklistElementuak" class="checklistElementuak">${(o.elementuak||[]).map(e=>`<div class="checklistElementua"><input type="checkbox" class="checkItem" ${e.eginda?"checked":""}><input type="text" class="checkItemTestua" placeholder="Zeregina" value="${ihesTestua(e.testua||"")}"><button type="button" onclick="this.parentElement.remove()">🗑️</button></div>`).join("")}</div><button onclick="gehituChecklistElementua()">➕ Beste elementu bat</button><br><br><button onclick="gordeOharra(${indizea===null?"null":indizea},'checklist')">💾 Gorde</button><button onclick="erakutsiEtxekoOharrak()">↩️ Itzuli</button>`;}
+ else{edukia.innerHTML=`<h2>📝 Oharra</h2><input type="text" id="oharIzenburua" placeholder="Adib. Gaur egin beharrekoak" value="${ihesTestua(o.izenburua||"")}"><textarea id="oharTestua" rows="12" placeholder="Idatzi zure oharra hemen...">${ihesTestua(o.testua||"")}</textarea><br><button onclick="gordeOharra(${indizea===null?"null":indizea},'oharra')">💾 Gorde</button><button onclick="erakutsiEtxekoOharrak()">↩️ Itzuli</button>`;}
+}
+function gehituChecklistElementua(){const z=document.getElementById("checklistElementuak");if(!z)return;const e=document.createElement("div");e.className="checklistElementua";e.innerHTML='<input type="checkbox" class="checkItem"><input type="text" class="checkItemTestua" placeholder="Zeregina"><button type="button" onclick="this.parentElement.remove()">🗑️</button>';z.appendChild(e);}
+function gordeOharra(indizea,mota){
+ const izenburua=document.getElementById("oharIzenburua")?.value.trim()||(mota==="checklist"?"Checklist":"Oharra");let o;
+ if(mota==="checklist"){const elementuak=[...document.querySelectorAll("#checklistElementuak .checklistElementua")].map(el=>({testua:el.querySelector(".checkItemTestua")?.value.trim()||"",eginda:!!el.querySelector(".checkItem")?.checked})).filter(e=>e.testua);o={mota,izenburua,elementuak};}
+ else{o={mota,izenburua,testua:document.getElementById("oharTestua")?.value||""};}
+ if(indizea===null)etxekoOharrak.push(o);else etxekoOharrak[indizea]=o;gordeDatuak();erakutsiEtxekoOharrak();
+}
+function irekiOharra(i){const o=etxekoOharrak[i];if(o)sortuOharra(o.mota,i);}
+function ezabatuOharra(i){if(!etxekoOharrak[i]||!confirm("Ohar hau ezabatu nahi duzu?"))return;etxekoOharrak.splice(i,1);gordeDatuak();erakutsiEtxekoOharrak();}
+
 // ========================================
 // SPOTIFY ERREPRODUKZIO-ZERRENDAK
 // ========================================
@@ -764,5 +790,3 @@ window.addEventListener("appinstalled", () => {
     if (botoia) botoia.remove();
 });
 
-
-// TEST WRITE: Etxeko oharrak prestatzen
