@@ -259,3 +259,26 @@ input, select { padding:9px; border:1px solid #ddd; border-radius:8px; max-width
 .calendarXehetasunEsteka{margin-top:15px}
 .calendarAgendaEkitaldia{display:block;width:100%;border:1px solid #e6e2dc;cursor:pointer;text-align:left;font:inherit}
 .calendarAgendaEkitaldia:hover{box-shadow:0 2px 8px rgba(0,0,0,.08)}
+
+
+/* ========================================
+   SAIOA / SUPABASE AUTH
+   ======================================== */
+.saioPantaila{display:flex;justify-content:center;align-items:center;min-height:360px}
+.saioTxartela{width:min(420px,100%);text-align:center;padding:28px;border:1px solid #e5e1db;border-radius:20px;background:#fafafa}
+.saioIkonoa{font-size:42px;margin-bottom:8px}
+.saioTxartela h2{margin:5px 0 8px}
+.saioAzalpena{color:#666;margin-bottom:22px}
+.saioTxartela form{display:grid;gap:8px;text-align:left}
+.saioTxartela label{font-weight:bold;margin-top:6px}
+.saioTxartela input{width:100%;padding:12px;border:1px solid #d8d4ce;border-radius:10px;background:white}
+.saioBotoiNagusia{width:100%;margin:10px 0 4px;background:#333;color:white}
+.saioBotoiBiguna{width:100%;background:#eee}
+.saioBotoiTestua{background:transparent;color:#666}
+.saioMezua{min-height:24px;margin:12px 0;color:#666;font-size:14px}
+.saioBereizlea{display:flex;align-items:center;gap:10px;color:#999;margin:10px 0}
+.saioBereizlea:before,.saioBereizlea:after{content:"";height:1px;background:#ddd;flex:1}
+.saioaGoiburua{display:flex;justify-content:space-between;align-items:center;gap:15px}
+.saioaGoiburua h2{margin-bottom:5px}
+.saioaGoiburua p{margin-top:0;color:#777}
+@media(max-width:600px){.saioaGoiburua{display:block}.saioaGoiburua button{width:100%;margin-top:8px}}
